@@ -48,17 +48,21 @@ type ISD uint16
 
 // ParseISD parses an ISD from a decimal string. Note that ISD 0 is parsed
 // without any errors.
+// @ ensures err != nil ==> err.ErrorMem()
 // @ decreases
-func ParseISD(s string) (ISD, error) {
+func ParseISD(s string) (ret_isd ISD, err error) {
 	isd, err := strconv.ParseUint(s, 10, ISDBits)
 	if err != nil {
-		return 0, serrors.Wrap("parsing ISD", err)
+		return 0, serrors.WrapStr("parsing ISD", err)
 	}
 	return ISD(isd), nil
 }
 
 // MustParseISD parses s and returns the corresponding addr.ISD object. It panics
 // if s is not valid ISD representation.
+// (VerifiedSCION) TODO: should this be trusted? How to handle such panics?
+// @ trusted
+// @ decreases
 func MustParseISD(s string) ISD {
 	isd, err := ParseISD(s)
 	if err != nil {
@@ -82,6 +86,7 @@ type AS uint64
 // ParseAS parses an AS from a decimal (in the case of the 32bit BGP AS number
 // space) or ipv6-style hex (in the case of SCION-only AS numbers) string.
 // @ ensures retErr == nil ==> retAs.inRange()
+// @ ensures retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func ParseAS(_as string) (retAs AS, retErr error) {
 	return parseAS(_as, ":")
@@ -89,15 +94,19 @@ func ParseAS(_as string) (retAs AS, retErr error) {
 
 // MustParseAS parses s and returns the corresponding addr.AS object. It panics
 // if s is not valid AS representation.
+// (VerifiedSCION) TODO: should this be trusted? How to handle such panics?
+// @ trusted
+// @ decreases
 func MustParseAS(s string) AS {
-	as, err := ParseAS(s)
+	_as, err := ParseAS(s)
 	if err != nil {
 		panic(err)
 	}
-	return as
+	return _as
 }
 
 // @ ensures retErr == nil ==> retAs.inRange()
+// @ ensures retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func parseAS(_as string, sep string) (retAs AS, retErr error) {
 	parts := strings.Split(_as, sep)
@@ -110,9 +119,9 @@ func parseAS(_as string, sep string) (retAs AS, retErr error) {
 		return 0, serrors.New("wrong number of separators", "sep", sep, "value", _as)
 	}
 	var parsed AS
-	//@ invariant 0 <= i && i <= asParts
-	//@ invariant acc(parts)
-	//@ decreases asParts - i
+	// @ invariant 0 <= i && i <= asParts
+	// @ invariant acc(parts)
+	// @ decreases asParts - i
 	for i := 0; i < asParts; i++ {
 		parsed <<= asPartBits
 		v, err := strconv.ParseUint(parts[i], asPartBase, asPartBits)
@@ -131,11 +140,12 @@ func parseAS(_as string, sep string) (retAs AS, retErr error) {
 }
 
 // @ ensures retErr == nil ==> retAs.inRange()
+// @ ensures retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func asParseBGP(s string) (retAs AS, retErr error) {
 	_as, err := strconv.ParseUint(s, 10, BGPASBits)
 	if err != nil {
-		return 0, serrors.Wrap("parsing BGP AS", err)
+		return 0, serrors.WrapStr("parsing BGP AS", err)
 	}
 	// (VerifiedSCION)
 	// The following assertions are needed to prove retAs.inRange().
@@ -217,8 +227,9 @@ func IAFrom(isd ISD, _as AS) (ia IA, err error) {
 }
 
 // ParseIA parses an IA from a string of the format 'isd-as'.
+// @ ensures err != nil ==> err.ErrorMem()
 // @ decreases
-func ParseIA(ia string) (IA, error) {
+func ParseIA(ia string) (ret_ia IA, err error) {
 	parts := strings.Split(ia, "-")
 	if len(parts) != 2 {
 		return 0, serrors.New("invalid ISD-AS", "value", ia)
@@ -236,6 +247,9 @@ func ParseIA(ia string) (IA, error) {
 
 // MustParseIA parses s and returns the corresponding addr.IA object. It
 // panics if s is not a valid ISD-AS representation.
+// (VerifiedSCION) TODO: should this be trusted? How to handle such panics?
+// @ trusted
+// @ decreases
 func MustParseIA(s string) IA {
 	ia, err := ParseIA(s)
 	if err != nil {
@@ -290,7 +304,6 @@ func (ia IA) IsWildcard() bool {
 
 // @ decreases
 func (ia IA) String() string {
-	// (VerifiedSCION) Added casts around ia.ISD() and ia.AS() to be able to pass them to 'fmt.Sprintf'
 	return fmt.Sprintf("%d-%s", ia.ISD(), ia.AS())
 }
 
