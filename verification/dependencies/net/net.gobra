@@ -152,3 +152,7 @@ type Listener interface {
 	decreases
 	Addr() (a Addr)
 }
+
+ensures err != nil ==> err.ErrorMem()
+decreases
+func SplitHostPort(hostport string) (host, port string, err error)
