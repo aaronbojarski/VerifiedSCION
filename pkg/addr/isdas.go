@@ -53,7 +53,7 @@ type ISD uint16
 func ParseISD(s string) (ret_isd ISD, err error) {
 	isd, err := strconv.ParseUint(s, 10, ISDBits)
 	if err != nil {
-		return 0, serrors.WrapStr("parsing ISD", err)
+		return 0, serrors.Wrap("parsing ISD", err)
 	}
 	return ISD(isd), nil
 }
@@ -120,7 +120,7 @@ func parseAS(_as string, sep string) (retAs AS, retErr error) {
 		parsed <<= asPartBits
 		v, err := strconv.ParseUint(parts[i], asPartBase, asPartBits)
 		if err != nil {
-			return 0, serrors.WrapStr("parsing AS part", err, "index", i, "value", _as)
+			return 0, serrors.Wrap("parsing AS part", err, "index", i, "value", _as)
 		}
 		parsed |= AS(v)
 	}
@@ -139,7 +139,7 @@ func parseAS(_as string, sep string) (retAs AS, retErr error) {
 func asParseBGP(s string) (retAs AS, retErr error) {
 	_as, err := strconv.ParseUint(s, 10, BGPASBits)
 	if err != nil {
-		return 0, serrors.WrapStr("parsing BGP AS", err)
+		return 0, serrors.Wrap("parsing BGP AS", err)
 	}
 	// (VerifiedSCION)
 	// The following assertions are needed to prove retAs.inRange().
