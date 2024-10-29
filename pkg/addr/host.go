@@ -78,6 +78,8 @@ func ParseHost(s string) (h Host, err error) {
 
 // MustParseHost calls ParseHost(s) and panics on error.
 // It is intended for use in tests with hard-coded strings.
+// @ requires false
+// @ decreases
 func MustParseHost(s string) Host {
 	host, err := ParseHost(s)
 	if err != nil {

@@ -60,6 +60,8 @@ func ParseISD(s string) (ret_isd ISD, err error) {
 
 // MustParseISD parses s and returns the corresponding addr.ISD object. It panics
 // if s is not valid ISD representation.
+// @ requires false
+// @ decreases
 func MustParseISD(s string) ISD {
 	isd, err := ParseISD(s)
 	if err != nil {
@@ -91,6 +93,8 @@ func ParseAS(_as string) (retAs AS, retErr error) {
 
 // MustParseAS parses s and returns the corresponding addr.AS object. It panics
 // if s is not valid AS representation.
+// @ requires false
+// @ decreases
 func MustParseAS(s string) AS {
 	_as, err := ParseAS(s)
 	if err != nil {
@@ -241,6 +245,8 @@ func ParseIA(ia string) (ret_ia IA, err error) {
 
 // MustParseIA parses s and returns the corresponding addr.IA object. It
 // panics if s is not a valid ISD-AS representation.
+// @ requires false
+// @ decreases
 func MustParseIA(s string) IA {
 	ia, err := ParseIA(s)
 	if err != nil {
