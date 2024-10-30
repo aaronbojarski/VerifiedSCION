@@ -14,8 +14,14 @@
 
 package netip
 
+import (
+  	def "github.com/scionproto/scion/verification/utils/definitions"
+)
 
-type Addr struct {}
+
+type Addr struct {
+	privateField def.PrivateField
+}
 
 decreases
 func (ip Addr)String() string
