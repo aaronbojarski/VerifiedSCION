@@ -54,7 +54,6 @@ func ParseAddr(s string) (addr Addr, err error) {
 // MustParseAddr calls ParseAddr(s) and panics on error.
 // It is intended for use in tests with hard-coded strings.
 // @ requires false
-// @ decreases
 func MustParseAddr(s string) Addr {
 	a, err := ParseAddr(s)
 	if err != nil {

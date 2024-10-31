@@ -23,9 +23,9 @@ type Addr struct {
 	privateField def.PrivateField
 }
 
-decreases
-func (ip Addr)String() string
+decreases _
+func (ip Addr) String() string
 
 ensures err != nil ==> err.ErrorMem()
-decreases
+decreases _
 func ParseAddr(s string) (addr Addr, err error)

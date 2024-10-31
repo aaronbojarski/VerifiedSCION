@@ -48,8 +48,9 @@ type SVC uint16
 // SVC addresses, use CS_A and DS_A; shorthand versions without
 // the _A suffix (e.g., CS) also return anycast SVC addresses. For multicast,
 // use CS_M, and DS_M.
+// @ ensures err != nil ==> err.ErrorMem()
 // @ decreases
-func ParseSVC(str string) (SVC, error) {
+func ParseSVC(str string) (svc SVC, err error) {
 	var m SVC
 	switch {
 	case strings.HasSuffix(str, "_A"):

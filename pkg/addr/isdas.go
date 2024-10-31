@@ -50,7 +50,7 @@ type ISD uint16
 // without any errors.
 // @ ensures err != nil ==> err.ErrorMem()
 // @ decreases
-func ParseISD(s string) (ret_isd ISD, err error) {
+func ParseISD(s string) (retIsd ISD, err error) {
 	isd, err := strconv.ParseUint(s, 10, ISDBits)
 	if err != nil {
 		return 0, serrors.Wrap("parsing ISD", err)
@@ -61,7 +61,6 @@ func ParseISD(s string) (ret_isd ISD, err error) {
 // MustParseISD parses s and returns the corresponding addr.ISD object. It panics
 // if s is not valid ISD representation.
 // @ requires false
-// @ decreases
 func MustParseISD(s string) ISD {
 	isd, err := ParseISD(s)
 	if err != nil {
@@ -70,9 +69,9 @@ func MustParseISD(s string) ISD {
 	return isd
 }
 
-// @ requires isd >= 0
 // @ decreases
 func (isd ISD) String() string {
+	// @ assume 0 <= isd
 	return strconv.FormatUint(uint64(isd), 10)
 }
 
@@ -94,7 +93,6 @@ func ParseAS(_as string) (retAs AS, retErr error) {
 // MustParseAS parses s and returns the corresponding addr.AS object. It panics
 // if s is not valid AS representation.
 // @ requires false
-// @ decreases
 func MustParseAS(s string) AS {
 	_as, err := ParseAS(s)
 	if err != nil {
@@ -227,7 +225,7 @@ func IAFrom(isd ISD, _as AS) (ia IA, err error) {
 // ParseIA parses an IA from a string of the format 'isd-as'.
 // @ ensures err != nil ==> err.ErrorMem()
 // @ decreases
-func ParseIA(ia string) (ret_ia IA, err error) {
+func ParseIA(ia string) (retIa IA, err error) {
 	parts := strings.Split(ia, "-")
 	if len(parts) != 2 {
 		return 0, serrors.New("invalid ISD-AS", "value", ia)
@@ -246,7 +244,6 @@ func ParseIA(ia string) (ret_ia IA, err error) {
 // MustParseIA parses s and returns the corresponding addr.IA object. It
 // panics if s is not a valid ISD-AS representation.
 // @ requires false
-// @ decreases
 func MustParseIA(s string) IA {
 	ia, err := ParseIA(s)
 	if err != nil {

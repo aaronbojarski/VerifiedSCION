@@ -109,7 +109,7 @@ func (h Host) Type() HostAddrType {
 
 // IP returns the IP address represented by h.
 // Panics if h.Type() is not HostTypeIP.
-// @ requires h.t == HostTypeIP
+// @ requires h.Type() == HostTypeIP
 // @ decreases
 func (h Host) IP() netip.Addr {
 	if h.t != HostTypeIP {
@@ -120,7 +120,7 @@ func (h Host) IP() netip.Addr {
 
 // SVC returns the SVC address represented by h.
 // Panics if h.Type() is not HostTypeSVC.
-// @ requires h.t == HostTypeSVC
+// @ requires h.Type() == HostTypeSVC
 // @ decreases
 func (h Host) SVC() SVC {
 	if h.t != HostTypeSVC {
@@ -129,7 +129,7 @@ func (h Host) SVC() SVC {
 	return h.svc
 }
 
-// @ requires (h.Type() == HostTypeNone) || (h.Type() == HostTypeIP) || (h.Type() == HostTypeSVC)
+// @ requires h.Type() == HostTypeNone || h.Type() == HostTypeIP || h.Type() == HostTypeSVC
 // @ decreases
 func (h Host) String() string {
 	switch h.Type() {

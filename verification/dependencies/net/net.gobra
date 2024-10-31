@@ -154,5 +154,5 @@ type Listener interface {
 }
 
 ensures err != nil ==> err.ErrorMem()
-decreases
+decreases _
 func SplitHostPort(hostport string) (host, port string, err error)
