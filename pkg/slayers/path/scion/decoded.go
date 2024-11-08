@@ -137,16 +137,12 @@ func (s *Decoded) SerializeTo(b []byte /*@, ghost ubuf []byte @*/) (r error) {
 	}
 	//@ unfold acc(s.Mem(ubuf), R1)
 	//@ assert sl.Bytes(b, 0, len(b))
-	//@ sl.SplitByIndex_Bytes(b, 0, len(b), MetaLen, writePerm)
-	//@ sl.Reslice_Bytes(b, 0, MetaLen, writePerm)
 	//@ unfold acc(s.Base.Mem(), R1)
-	if err := s.PathMeta.SerializeTo(b[:MetaLen]); err != nil {
+	if err := s.PathMeta.SerializeTo(b); err != nil {
 		//@ Unreachable()
 		return err
 	}
 	//@ fold acc(s.Base.Mem(), R1)
-	//@ sl.Unslice_Bytes(b, 0, MetaLen, writePerm)
-	//@ sl.CombineAtIndex_Bytes(b, 0, len(b), MetaLen, writePerm)
 	//@ fold acc(s.Mem(ubuf), R1)
 	offset := MetaLen
 
