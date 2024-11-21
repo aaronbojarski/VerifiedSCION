@@ -88,14 +88,16 @@ func MustParseHost(s string) Host {
 }
 
 // HostIP returns a Host address representing ip, with type HostTypeIP.
+// @ ensures host.Type() == HostTypeIP
 // @ decreases
-func HostIP(ip netip.Addr) Host {
+func HostIP(ip netip.Addr) (host Host) {
 	return Host{t: HostTypeIP, ip: ip}
 }
 
 // HostSvc returns a Host address representing svc, with type HostTypeSVC.
+// @ ensures host.Type() == HostTypeSVC
 // @ decreases
-func HostSVC(svc SVC) Host {
+func HostSVC(svc SVC) (host Host) {
 	return Host{t: HostTypeSVC, svc: svc}
 }
 

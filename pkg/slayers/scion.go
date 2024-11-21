@@ -270,6 +270,7 @@ func (s *SCION) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeO
 	binary.BigEndian.PutUint16(buf[6:8], s.PayloadLen)
 	buf[8] = uint8(s.PathType)
 	buf[9] = uint8(s.DstAddrType&0xF)<<4 | uint8(s.SrcAddrType&0xF)
+	// @ assert &buf[10:12][0] == &buf[10] && &buf[10:12][1] == &buf[11]
 	binary.BigEndian.PutUint16(buf[10:12], 0)
 	// @ fold acc(sl.Bytes(uSerBufN, 0, len(uSerBufN)), writePerm)
 	// @ ghost if s.EqPathType(ubuf) {
@@ -359,7 +360,7 @@ func (s *SCION) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) (res er
 	// @ preserves acc(&s.NextHdr) && acc(&s.HdrLen) && acc(&s.PayloadLen) && acc(&s.PathType)
 	// @ preserves acc(&s.DstAddrType) && acc(&s.SrcAddrType)
 	// @ preserves CmnHdrLen <= len(data) && acc(sl.Bytes(data, 0, len(data)), R41)
-	// @ ensures   s.DstAddrType.Has3Bits() && s.SrcAddrType.Has3Bits()
+	// @ ensures   s.DstAddrType.Has4Bits() && s.SrcAddrType.Has4Bits()
 	// @ ensures   0 <= s.PathType && s.PathType < 256
 	// @ ensures   path.Type(GetPathType(data)) == s.PathType
 	// @ ensures   L4ProtocolType(GetNextHdr(data)) == s.NextHdr
@@ -375,8 +376,13 @@ func (s *SCION) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) (res er
 	s.PayloadLen = binary.BigEndian.Uint16(data[6:8])
 	// @ b.ByteValue(data[8])
 	s.PathType = path.Type(data[8])
+	// @ assert 0 <= s.PathType && s.PathType < 256
 	s.DstAddrType = AddrType(data[9] >> 4 & 0xF)
+	// @ assert int(s.DstAddrType) == b.BitAndF(int(data[9] >> 4))
 	s.SrcAddrType = AddrType(data[9] & 0xF)
+	// @ assert int(s.SrcAddrType) == b.BitAndF(int(data[9]))
+	// @ fold acc(sl.Bytes(data, 0, len(data)), R41)
+	// @ )
 
 	// Decode address header.
 	// @ sl.SplitByIndex_Bytes(data, 0, len(data), CmnHdrLen, R41)
@@ -598,55 +604,117 @@ func scionNextLayerTypeL4(t L4ProtocolType) gopacket.LayerType {
 }
 
 // DstAddr parses the destination address into a addr.Host.
-func (s *SCION) DstAddr() (addr.Host, error) {
+// @ requires acc(&s.DstAddrType, R20) && acc(&s.RawDstAddr, R20)
+// @ requires s.DstAddrType == T4Svc ==> len(s.RawDstAddr) >= HostLenSVC
+// @ requires acc(sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr)), R15)
+// @ ensures  acc(&s.DstAddrType, R20) && acc(&s.RawDstAddr, R20)
+// @ ensures  err == nil ==> res.Type() == addr.HostTypeIP || res.Type() == addr.HostTypeSVC
+// @ ensures  err != nil ==>
+// @ 	acc(sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr)), R15)
+// @ ensures  err != nil ==> err.ErrorMem()
+// @ decreases
+func (s *SCION) DstAddr() (res addr.Host, err error) {
 	return ParseAddr(s.DstAddrType, s.RawDstAddr)
 }
 
 // SrcAddr parses the source address into a addr.Host.
-func (s *SCION) SrcAddr() (addr.Host, error) {
+// underlaying layer data. Changing the net.Addr object might lead to inconsistent layer information
+// and thus should be treated read-only. Instead, SetDstAddr should be used to update the source
+// address.
+// @ requires  acc(&s.SrcAddrType, R20) && acc(&s.RawSrcAddr, R20)
+// @ requires  s.SrcAddrType == T4Svc ==> len(s.RawSrcAddr) >= HostLenSVC
+// @ requires  acc(sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr)), R15)
+// @ ensures   acc(&s.SrcAddrType, R20) && acc(&s.RawSrcAddr, R20)
+// @ ensures  err == nil ==> res.Type() == addr.HostTypeIP || res.Type() == addr.HostTypeSVC
+// @ ensures   err != nil ==>
+// @ 	acc(sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr)), R15)
+// @ ensures   err != nil ==> err.ErrorMem()
+// @ decreases
+func (s *SCION) SrcAddr() (res addr.Host, err error) {
 	return ParseAddr(s.SrcAddrType, s.RawSrcAddr)
 }
 
 // SetDstAddr sets the destination address and updates the DstAddrType field accordingly.
-func (s *SCION) SetDstAddr(dst addr.Host) error {
+// @ requires  acc(&s.RawDstAddr)
+// @ requires  acc(&s.DstAddrType)
+// @ ensures   isHostTypeIP(dst) ==> res == nil
+// @ ensures   isHostTypeSVC(dst) ==> res == nil
+// @ ensures   acc(&s.RawDstAddr) && acc(&s.DstAddrType)
+// @ ensures   res != nil ==> res.ErrorMem()
+// @ ensures   res == nil ==> isHostTypeIP(dst) || isHostTypeSVC(dst)
+// @ ensures   res == nil ==> sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr))
+// @ ensures   (res == nil) == (dst.Type() == addr.HostTypeIP || dst.Type() == addr.HostTypeSVC)
+// @ decreases
+func (s *SCION) SetDstAddr(dst addr.Host) (res error) {
 	var err error
 	s.DstAddrType, s.RawDstAddr, err = PackAddr(dst)
 	return err
 }
 
 // SetSrcAddr sets the source address and updates the DstAddrType field accordingly.
-func (s *SCION) SetSrcAddr(src addr.Host) error {
+// @ requires  acc(&s.RawSrcAddr)
+// @ requires  acc(&s.SrcAddrType)
+// @ ensures   isHostTypeIP(src) ==> res == nil
+// @ ensures   isHostTypeSVC(src) ==> res == nil
+// @ ensures   acc(&s.RawSrcAddr) && acc(&s.SrcAddrType)
+// @ ensures   res != nil ==> res.ErrorMem()
+// @ ensures   res == nil ==> isHostTypeIP(src) || isHostTypeSVC(src)
+// @ ensures   res == nil ==> sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr))
+// @ ensures   (res == nil) == (src.Type() == addr.HostTypeIP || src.Type() == addr.HostTypeSVC)
+// @ decreases
+func (s *SCION) SetSrcAddr(src addr.Host) (res error) {
 	var err error
 	s.SrcAddrType, s.RawSrcAddr, err = PackAddr(src)
 	return err
 }
 
-func ParseAddr(addrType AddrType, raw []byte) (addr.Host, error) {
+// @ requires addrType == T4Svc ==> len(raw) >= HostLenSVC
+// @ requires acc(sl.Bytes(raw, 0, len(raw)), R15)
+// @ ensures  err == nil ==> res.Type() == addr.HostTypeIP || res.Type() == addr.HostTypeSVC
+// @ ensures  acc(sl.Bytes(raw, 0, len(raw)), R15)
+// @ ensures  err != nil ==> err.ErrorMem()
+// @ decreases
+func ParseAddr(addrType AddrType, raw []byte) (res addr.Host, err error) {
 	switch addrType {
 	case T4Ip:
-		var raw4 [4]byte
-		copy(raw4[:], raw)
+		var raw4 /*@ @ @*/ [4]byte
+		// @ unfold acc(sl.Bytes(raw, 0, len(raw)), R15)
+		copy(raw4[:], raw /*@, R15 @*/)
+		// @ fold acc(sl.Bytes(raw, 0, len(raw)), R15)
 		return addr.HostIP(netip.AddrFrom4(raw4)), nil
 	case T4Svc:
+		// @ unfold acc(sl.Bytes(raw, 0, len(raw)), R15)
 		svc := addr.SVC(binary.BigEndian.Uint16(raw[:2]))
+		// @ fold acc(sl.Bytes(raw, 0, len(raw)), R15)
 		return addr.HostSVC(svc), nil
 	case T16Ip:
-		var raw16 [16]byte
-		copy(raw16[:], raw)
+		var raw16 /*@ @ @*/ [16]byte
+		// @ unfold acc(sl.Bytes(raw, 0, len(raw)), R15)
+		copy(raw16[:], raw /*@, R15 @*/)
+		// @ fold acc(sl.Bytes(raw, 0, len(raw)), R15)
 		return addr.HostIP(netip.AddrFrom16(raw16)), nil
 	}
 	return addr.Host{}, serrors.New("unsupported address type/length combination",
 		"type", addrType, "len", addrType.Length())
 }
 
-func PackAddr(host addr.Host) (AddrType, []byte, error) {
+// @ ensures   isHostTypeIP(host) ==> err == nil 		// TODO(aaronbojarski): this is not true, IP also has to be valid
+// @ ensures   isHostTypeSVC(host) ==> err == nil
+// @ ensures   err == nil ==> isHostTypeIP(host) || isHostTypeSVC(host)
+// @ ensures   err != nil ==> err.ErrorMem()
+// @ ensures   err == nil ==> sl.Bytes(b, 0, len(b))	// TODO(aaronbojarski): for a return value of []byte, do I need acc(sl.Bytes(...)) or use sl.Bytes(...)?
+// @ ensures   (err == nil) == (host.Type() == addr.HostTypeIP || host.Type() == addr.HostTypeSVC)
+// @ decreases
+func PackAddr(host addr.Host) (addrtyp AddrType, b []byte, err error) {
 	switch host.Type() {
 	case addr.HostTypeIP:
 		// The IP is potentially IPv4-in-IPv6. We need to unmap it to ensure
 		// we only have true IPv4 or IPv6 addresses.
 		ip := host.IP().Unmap()
 		if !ip.IsValid() {
-			break
+			//(VerifiedSCION) Gobra does not support break inside switch statement.
+			// revert to break and mark function as trusted until gobra supports it.
+			return 0, nil, serrors.New("unsupported address", "addr", host)
 		}
 		if ip.Is6() {
 			return T16Ip, ip.AsSlice(), nil
@@ -655,6 +723,7 @@ func PackAddr(host addr.Host) (AddrType, []byte, error) {
 	case addr.HostTypeSVC:
 		raw := make([]byte, 4)
 		binary.BigEndian.PutUint16(raw, uint16(host.SVC()))
+		// @ fold sl.Bytes(raw, 0, len(raw))
 		return T4Svc, raw, nil
 	}
 	return 0, nil, serrors.New("unsupported address", "addr", host)
@@ -671,7 +740,7 @@ func PackAddr(host addr.Host) (AddrType, []byte, error) {
 //	multiple contracts per method.
 //
 // @ preserves insideSlayers  ==> acc(&s.DstAddrType, R50) && acc(&s.SrcAddrType, R50)
-// @ preserves insideSlayers  ==> (s.DstAddrType.Has3Bits() && s.SrcAddrType.Has3Bits())
+// @ preserves insideSlayers  ==> (s.DstAddrType.Has4Bits() && s.SrcAddrType.Has4Bits())
 // @ preserves !insideSlayers ==> acc(s.Mem(ubuf), R50)
 // @ ensures   insideSlayers  ==> res == s.AddrHdrLenSpecInternal()
 // @ ensures   !insideSlayers ==> res == s.AddrHdrLenSpec(ubuf)
@@ -755,8 +824,8 @@ func (s *SCION) SerializeAddrHdr(buf []byte /*@ , ghost ubuf []byte @*/) (err er
 // buffer. The caller must ensure that the correct address types and lengths are set in the SCION
 // layer, otherwise the results of this method are undefined.
 // @ requires  acc(&s.SrcIA) && acc(&s.DstIA)
-// @ requires  acc(&s.SrcAddrType, HalfPerm) && s.SrcAddrType.Has3Bits()
-// @ requires  acc(&s.DstAddrType, HalfPerm) && s.DstAddrType.Has3Bits()
+// @ requires  acc(&s.SrcAddrType, HalfPerm) && s.SrcAddrType.Has4Bits()
+// @ requires  acc(&s.DstAddrType, HalfPerm) && s.DstAddrType.Has4Bits()
 // @ requires  acc(&s.RawSrcAddr) && acc(&s.RawDstAddr)
 // @ preserves acc(sl.Bytes(data, 0, len(data)), R41)
 // @ ensures   res == nil ==> s.HeaderMem(data)

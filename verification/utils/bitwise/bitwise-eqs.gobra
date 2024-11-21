@@ -43,6 +43,13 @@ decreases
 func BitAnd7(b int) (res int)
 
 ghost
+pure
+ensures 0 <= b & 0xF && b & 0xF <= 15
+ensures res == b & 0xF
+decreases
+func BitAndF(b int) (res int)
+
+ghost
 ensures res == b >> 30
 ensures 0 <= res && res <= 3
 decreases

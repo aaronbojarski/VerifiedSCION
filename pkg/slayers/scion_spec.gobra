@@ -34,6 +34,10 @@ import (
 	"verification/utils/seqs"
 )
 
+const (
+	HostLenSVC = 2
+)
+
 pred PathPoolMem(pathPool []path.Path, pathPoolRaw path.Path) {
 	// non-initialized path pool:
 	(pathPool == nil ==> pathPoolRaw == nil) &&
@@ -152,8 +156,8 @@ pred (s *SCION) Mem(ubuf []byte) {
 	acc(&s.HdrLen) &&
 	acc(&s.PayloadLen) &&
 	acc(&s.PathType) &&
-	acc(&s.DstAddrType, HalfPerm) && s.DstAddrType.Has3Bits() &&
-	acc(&s.SrcAddrType, HalfPerm) && s.SrcAddrType.Has3Bits() &&
+	acc(&s.DstAddrType, HalfPerm) && s.DstAddrType.Has4Bits() &&
+	acc(&s.SrcAddrType, HalfPerm) && s.SrcAddrType.Has4Bits() &&
 	// len of ubuf:
 	0 <= s.HdrLen &&
 	0 <= CmnHdrLen + s.AddrHdrLenSpecInternal() &&
@@ -200,8 +204,8 @@ pure func (s *SCION) ValidPathMetaData(ghost ub []byte) bool {
 pred (s *SCION) HeaderMem(ubuf []byte) {
 	acc(&s.DstIA) &&
 	acc(&s.SrcIA) &&
-	acc(&s.DstAddrType, HalfPerm) && s.DstAddrType.Has3Bits() &&
-	acc(&s.SrcAddrType, HalfPerm) && s.SrcAddrType.Has3Bits() &&
+	acc(&s.DstAddrType, HalfPerm) && s.DstAddrType.Has4Bits() &&
+	acc(&s.SrcAddrType, HalfPerm) && s.SrcAddrType.Has4Bits() &&
 	s.AddrHdrLenSpecInternal() <= len(ubuf) &&
 	// helper facts to deal with incompletnesses when establising the bounds of s.RawDstAddr and s.RawSrcAddr
 	s.AddrHdrLenSpecInternal() <= len(ubuf) &&
@@ -248,7 +252,7 @@ pred (b *BaseLayer) Mem(ghost ub []byte, ghost breakPoint int) {
 ghost
 requires acc(s.Mem(ub), R15)
 ensures  acc(s, R16)
-ensures  s.DstAddrType == T4Svc ==> len(s.RawDstAddr) >= addr.HostLenSVC
+ensures  s.DstAddrType == T4Svc ==> len(s.RawDstAddr) >= HostLenSVC
 ensures  0 <= start && start <= end && end <= len(ub)
 ensures  s.RawDstAddr === ub[start:end]
 ensures  acc(s, R16) --* acc(s.Mem(ub), R15)
@@ -273,6 +277,13 @@ pure
 decreases
 func (a AddrType) Has3Bits() (res bool) {
 	return 0 <= a && a <= 7
+}
+
+ghost
+pure
+decreases
+func (a AddrType) Has4Bits() (res bool) {
+	return 0 <= a && a <= 15
 }
 
 ghost
@@ -542,8 +553,8 @@ requires CmnHdrLen <= length
 decreases
 pure func GetAddressOffsetWithinLength(ub []byte, length int) int {
 	return unfolding acc(sl.Bytes(ub, 0, length), _) in
-		let dstAddrLen := AddrType(ub[9] >> 4 & 0x7).Length() in
-		let srcAddrLen := AddrType(ub[9] & 0x7).Length() in
+		let dstAddrLen := AddrType(ub[9] >> 4 & 0xF).Length() in
+		let srcAddrLen := AddrType(ub[9] & 0xF).Length() in
 		CmnHdrLen + 2*addr.IABytes + dstAddrLen + srcAddrLen
 }
 
@@ -629,7 +640,7 @@ pure func (s *SCION) GetPayload(ghost ub []byte) []byte {
 
 ghost
 requires acc(&s.DstAddrType, _) && acc(&s.SrcAddrType, _)
-requires s.DstAddrType.Has3Bits() && s.SrcAddrType.Has3Bits()
+requires s.DstAddrType.Has4Bits() && s.SrcAddrType.Has4Bits()
 ensures  0 <= res
 decreases
 pure
@@ -722,31 +733,15 @@ pure func isConvertibleToIPv4(a net.Addr) bool {
 }
 
 ghost
-requires typeOf(a) == *net.IPAddr
-requires acc(&a.(*net.IPAddr).IP, _)
 decreases
-pure func isIPv6(a net.Addr) bool {
-	return len(a.(*net.IPAddr).IP) == net.IPv6len
-}
-
-ghost
-requires typeOf(a) == *net.IPAddr
-requires acc(&a.(*net.IPAddr).IP, _)
-decreases
-pure func isIPv4(a net.Addr) bool {
-	return len(a.(*net.IPAddr).IP) == net.IPv4len
+pure func isHostTypeIP(a addr.Host) bool {
+	return a.Type() == addr.HostTypeIP
 }
 
 ghost
 decreases
-pure func isIP(a net.Addr) bool {
-	return typeOf(a) == *net.IPAddr
-}
-
-ghost
-decreases
-pure func isHostSVC(a net.Addr) bool {
-	return typeOf(a) == addr.HostSVC
+pure func isHostTypeSVC(a addr.Host) bool {
+	return a.Type() == addr.HostTypeSVC
 }
 
 // invariant established by initialization
