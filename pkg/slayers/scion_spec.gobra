@@ -734,13 +734,13 @@ pure func isConvertibleToIPv4(a net.Addr) bool {
 
 ghost
 decreases
-pure func isHostTypeIP(a addr.Host) bool {
+pure func IsHostTypeIP(a addr.Host) bool {
 	return a.Type() == addr.HostTypeIP
 }
 
 ghost
 decreases
-pure func isHostTypeSVC(a addr.Host) bool {
+pure func IsHostTypeSVC(a addr.Host) bool {
 	return a.Type() == addr.HostTypeSVC
 }
 

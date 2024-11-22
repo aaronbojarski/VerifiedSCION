@@ -608,7 +608,7 @@ func scionNextLayerTypeL4(t L4ProtocolType) gopacket.LayerType {
 // @ requires s.DstAddrType == T4Svc ==> len(s.RawDstAddr) >= HostLenSVC
 // @ requires acc(sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr)), R15)
 // @ ensures  acc(&s.DstAddrType, R20) && acc(&s.RawDstAddr, R20)
-// @ ensures  err == nil ==> res.Type() == addr.HostTypeIP || res.Type() == addr.HostTypeSVC
+// @ ensures  err == nil ==> IsHostTypeIP(res)  || IsHostTypeSVC(res)
 // @ ensures  err != nil ==>
 // @ 	acc(sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr)), R15)
 // @ ensures  err != nil ==> err.ErrorMem()
@@ -625,7 +625,7 @@ func (s *SCION) DstAddr() (res addr.Host, err error) {
 // @ requires  s.SrcAddrType == T4Svc ==> len(s.RawSrcAddr) >= HostLenSVC
 // @ requires  acc(sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr)), R15)
 // @ ensures   acc(&s.SrcAddrType, R20) && acc(&s.RawSrcAddr, R20)
-// @ ensures  err == nil ==> res.Type() == addr.HostTypeIP || res.Type() == addr.HostTypeSVC
+// @ ensures  err == nil ==> IsHostTypeIP(res)  || IsHostTypeSVC(res)
 // @ ensures   err != nil ==>
 // @ 	acc(sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr)), R15)
 // @ ensures   err != nil ==> err.ErrorMem()
@@ -640,7 +640,7 @@ func (s *SCION) SrcAddr() (res addr.Host, err error) {
 // @ ensures   isHostTypeSVC(dst) ==> res == nil
 // @ ensures   acc(&s.RawDstAddr) && acc(&s.DstAddrType)
 // @ ensures   res != nil ==> res.ErrorMem()
-// @ ensures   res == nil ==> isHostTypeIP(dst) || isHostTypeSVC(dst)
+// @ ensures   res == nil ==> IsHostTypeIP(dst) || IsHostTypeSVC(dst)
 // @ ensures   res == nil ==> sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr))
 // @ decreases
 func (s *SCION) SetDstAddr(dst addr.Host) (res error) {
@@ -655,7 +655,7 @@ func (s *SCION) SetDstAddr(dst addr.Host) (res error) {
 // @ ensures   isHostTypeSVC(src) ==> res == nil
 // @ ensures   acc(&s.RawSrcAddr) && acc(&s.SrcAddrType)
 // @ ensures   res != nil ==> res.ErrorMem()
-// @ ensures   res == nil ==> isHostTypeIP(src) || isHostTypeSVC(src)
+// @ ensures   res == nil ==> IsHostTypeIP(src) || IsHostTypeSVC(src)
 // @ ensures   res == nil ==> sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr))
 // @ decreases
 func (s *SCION) SetSrcAddr(src addr.Host) (res error) {
@@ -666,7 +666,7 @@ func (s *SCION) SetSrcAddr(src addr.Host) (res error) {
 
 // @ requires addrType == T4Svc ==> len(raw) >= HostLenSVC
 // @ requires acc(sl.Bytes(raw, 0, len(raw)), R15)
-// @ ensures  err == nil ==> res.Type() == addr.HostTypeIP || res.Type() == addr.HostTypeSVC
+// @ ensures  err == nil ==> IsHostTypeIP(res) || IsHostTypeSVC(res)
 // @ ensures  acc(sl.Bytes(raw, 0, len(raw)), R15)
 // @ ensures  err != nil ==> err.ErrorMem()
 // @ decreases
@@ -694,8 +694,8 @@ func ParseAddr(addrType AddrType, raw []byte) (res addr.Host, err error) {
 		"type", addrType, "len", addrType.Length())
 }
 
-// @ ensures   host.Type() == addr.HostTypeSVC ==> err == nil
-// @ ensures   err == nil ==> host.Type() == addr.HostTypeIP || host.Type() == addr.HostTypeSVC
+// @ ensures   IsHostTypeSVC(addr)  ==> err == nil
+// @ ensures   err == nil ==> IsHostTypeIP(addr) || IsHostTypeSVC(addr)
 // @ ensures   err != nil ==> err.ErrorMem()
 // @ ensures   err == nil ==> sl.Bytes(b, 0, len(b))
 // @ decreases
