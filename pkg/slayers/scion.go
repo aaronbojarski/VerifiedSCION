@@ -637,13 +637,11 @@ func (s *SCION) SrcAddr() (res addr.Host, err error) {
 // SetDstAddr sets the destination address and updates the DstAddrType field accordingly.
 // @ requires  acc(&s.RawDstAddr)
 // @ requires  acc(&s.DstAddrType)
-// @ ensures   isHostTypeIP(dst) ==> res == nil
 // @ ensures   isHostTypeSVC(dst) ==> res == nil
 // @ ensures   acc(&s.RawDstAddr) && acc(&s.DstAddrType)
 // @ ensures   res != nil ==> res.ErrorMem()
 // @ ensures   res == nil ==> isHostTypeIP(dst) || isHostTypeSVC(dst)
 // @ ensures   res == nil ==> sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr))
-// @ ensures   (res == nil) == (dst.Type() == addr.HostTypeIP || dst.Type() == addr.HostTypeSVC)
 // @ decreases
 func (s *SCION) SetDstAddr(dst addr.Host) (res error) {
 	var err error
@@ -654,13 +652,11 @@ func (s *SCION) SetDstAddr(dst addr.Host) (res error) {
 // SetSrcAddr sets the source address and updates the DstAddrType field accordingly.
 // @ requires  acc(&s.RawSrcAddr)
 // @ requires  acc(&s.SrcAddrType)
-// @ ensures   isHostTypeIP(src) ==> res == nil
 // @ ensures   isHostTypeSVC(src) ==> res == nil
 // @ ensures   acc(&s.RawSrcAddr) && acc(&s.SrcAddrType)
 // @ ensures   res != nil ==> res.ErrorMem()
 // @ ensures   res == nil ==> isHostTypeIP(src) || isHostTypeSVC(src)
 // @ ensures   res == nil ==> sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr))
-// @ ensures   (res == nil) == (src.Type() == addr.HostTypeIP || src.Type() == addr.HostTypeSVC)
 // @ decreases
 func (s *SCION) SetSrcAddr(src addr.Host) (res error) {
 	var err error
@@ -698,12 +694,10 @@ func ParseAddr(addrType AddrType, raw []byte) (res addr.Host, err error) {
 		"type", addrType, "len", addrType.Length())
 }
 
-// @ ensures   isHostTypeIP(host) ==> err == nil 		// TODO(aaronbojarski): this is not true, IP also has to be valid
-// @ ensures   isHostTypeSVC(host) ==> err == nil
-// @ ensures   err == nil ==> isHostTypeIP(host) || isHostTypeSVC(host)
+// @ ensures   host.Type() == addr.HostTypeSVC ==> err == nil
+// @ ensures   err == nil ==> host.Type() == addr.HostTypeIP || host.Type() == addr.HostTypeSVC
 // @ ensures   err != nil ==> err.ErrorMem()
-// @ ensures   err == nil ==> sl.Bytes(b, 0, len(b))	// TODO(aaronbojarski): for a return value of []byte, do I need acc(sl.Bytes(...)) or use sl.Bytes(...)?
-// @ ensures   (err == nil) == (host.Type() == addr.HostTypeIP || host.Type() == addr.HostTypeSVC)
+// @ ensures   err == nil ==> sl.Bytes(b, 0, len(b))
 // @ decreases
 func PackAddr(host addr.Host) (addrtyp AddrType, b []byte, err error) {
 	switch host.Type() {
