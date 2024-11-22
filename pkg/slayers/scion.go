@@ -637,7 +637,7 @@ func (s *SCION) SrcAddr() (res addr.Host, err error) {
 // SetDstAddr sets the destination address and updates the DstAddrType field accordingly.
 // @ requires  acc(&s.RawDstAddr)
 // @ requires  acc(&s.DstAddrType)
-// @ ensures   isHostTypeSVC(dst) ==> res == nil
+// @ ensures   IsHostTypeSVC(dst) ==> res == nil
 // @ ensures   acc(&s.RawDstAddr) && acc(&s.DstAddrType)
 // @ ensures   res != nil ==> res.ErrorMem()
 // @ ensures   res == nil ==> IsHostTypeIP(dst) || IsHostTypeSVC(dst)
@@ -652,7 +652,7 @@ func (s *SCION) SetDstAddr(dst addr.Host) (res error) {
 // SetSrcAddr sets the source address and updates the DstAddrType field accordingly.
 // @ requires  acc(&s.RawSrcAddr)
 // @ requires  acc(&s.SrcAddrType)
-// @ ensures   isHostTypeSVC(src) ==> res == nil
+// @ ensures   IsHostTypeSVC(src) ==> res == nil
 // @ ensures   acc(&s.RawSrcAddr) && acc(&s.SrcAddrType)
 // @ ensures   res != nil ==> res.ErrorMem()
 // @ ensures   res == nil ==> IsHostTypeIP(src) || IsHostTypeSVC(src)
@@ -694,8 +694,8 @@ func ParseAddr(addrType AddrType, raw []byte) (res addr.Host, err error) {
 		"type", addrType, "len", addrType.Length())
 }
 
-// @ ensures   IsHostTypeSVC(addr)  ==> err == nil
-// @ ensures   err == nil ==> IsHostTypeIP(addr) || IsHostTypeSVC(addr)
+// @ ensures   IsHostTypeSVC(host)  ==> err == nil
+// @ ensures   err == nil ==> IsHostTypeIP(host) || IsHostTypeSVC(host)
 // @ ensures   err != nil ==> err.ErrorMem()
 // @ ensures   err == nil ==> sl.Bytes(b, 0, len(b))
 // @ decreases
