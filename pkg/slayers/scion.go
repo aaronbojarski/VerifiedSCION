@@ -694,11 +694,15 @@ func ParseAddr(addrType AddrType, raw []byte) (res addr.Host, err error) {
 		"type", addrType, "len", addrType.Length())
 }
 
-// @ ensures   IsHostTypeSVC(host)  ==> err == nil
+// @ ensures   IsHostTypeSVC(host) ==> err == nil
 // @ ensures   err == nil ==> IsHostTypeIP(host) || IsHostTypeSVC(host)
 // @ ensures   err != nil ==> err.ErrorMem()
 // @ ensures   err == nil ==> sl.Bytes(b, 0, len(b))
 // @ decreases
+// (VerifiedSCION) Gobra does not support break inside switch statement.
+// Therefore the function is here marked as trusted while the body is verified in scion_test.gobra separately.
+// This is done s.t. we do not need to rewrite the actual code.
+// @ trusted
 func PackAddr(host addr.Host) (addrtyp AddrType, b []byte, err error) {
 	switch host.Type() {
 	case addr.HostTypeIP:
@@ -706,9 +710,7 @@ func PackAddr(host addr.Host) (addrtyp AddrType, b []byte, err error) {
 		// we only have true IPv4 or IPv6 addresses.
 		ip := host.IP().Unmap()
 		if !ip.IsValid() {
-			//(VerifiedSCION) Gobra does not support break inside switch statement.
-			// revert to break and mark function as trusted until gobra supports it.
-			return 0, nil, serrors.New("unsupported address", "addr", host)
+			break
 		}
 		if ip.Is6() {
 			return T16Ip, ip.AsSlice(), nil
