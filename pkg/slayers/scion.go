@@ -618,9 +618,6 @@ func (s *SCION) DstAddr() (res addr.Host, err error) {
 }
 
 // SrcAddr parses the source address into a addr.Host.
-// underlaying layer data. Changing the net.Addr object might lead to inconsistent layer information
-// and thus should be treated read-only. Instead, SetDstAddr should be used to update the source
-// address.
 // @ requires  acc(&s.SrcAddrType, R20) && acc(&s.RawSrcAddr, R20)
 // @ requires  s.SrcAddrType == T4Svc ==> len(s.RawSrcAddr) >= HostLenSVC
 // @ requires  acc(sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr)), R15)
