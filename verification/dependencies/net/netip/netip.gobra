@@ -24,6 +24,11 @@ type Addr struct {
 	privateField def.PrivateField
 }
 
+type AddrPort struct {
+	ip   Addr
+	port uint16
+}
+
 decreases _
 func (ip Addr) String() string
 
@@ -45,8 +50,18 @@ decreases _
 func (ip Addr) IsValid() (res bool)
 
 decreases _
+func (ip Addr) Is4() bool
+
+decreases _
 func (ip Addr) Is6() bool
 
 ensures ip.IsValid() ==> sl.Bytes(b, 0, len(b))
 decreases _
 func (ip Addr) AsSlice() (b []byte)
+
+pure
+decreases _
+func (p AddrPort) IsValid() bool
+
+decreases
+func (p AddrPort) Addr() Addr
