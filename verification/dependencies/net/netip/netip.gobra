@@ -63,5 +63,5 @@ pure
 decreases _
 func (p AddrPort) IsValid() bool
 
-decreases
+decreases _
 func (p AddrPort) Addr() Addr
