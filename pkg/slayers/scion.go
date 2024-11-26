@@ -378,9 +378,9 @@ func (s *SCION) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) (res er
 	s.PathType = path.Type(data[8])
 	// @ assert 0 <= s.PathType && s.PathType < 256
 	s.DstAddrType = AddrType(data[9] >> 4 & 0xF)
-	// @ assert int(s.DstAddrType) == b.BitAndF(int(data[9] >> 4))
+	// @ assert byte(s.DstAddrType) == b.BitAndF(data[9] >> 4)
 	s.SrcAddrType = AddrType(data[9] & 0xF)
-	// @ assert int(s.SrcAddrType) == b.BitAndF(int(data[9]))
+	// @ assert byte(s.SrcAddrType) == b.BitAndF(data[9])
 	// @ fold acc(sl.Bytes(data, 0, len(data)), R41)
 	// @ )
 
@@ -604,14 +604,13 @@ func scionNextLayerTypeL4(t L4ProtocolType) gopacket.LayerType {
 }
 
 // DstAddr parses the destination address into a addr.Host.
-// @ requires acc(&s.DstAddrType, R20) && acc(&s.RawDstAddr, R20)
-// @ requires s.DstAddrType == T4Svc ==> len(s.RawDstAddr) >= HostLenSVC
-// @ requires acc(sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr)), R15)
-// @ ensures  acc(&s.DstAddrType, R20) && acc(&s.RawDstAddr, R20)
-// @ ensures  err == nil ==> IsHostTypeIP(res)  || IsHostTypeSVC(res)
-// @ ensures  err != nil ==>
-// @ 	acc(sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr)), R15)
-// @ ensures  err != nil ==> err.ErrorMem()
+// @ requires  acc(&s.DstAddrType, R20) && acc(&s.RawDstAddr, R20)
+// @ requires  s.DstAddrType == T4Svc ==> len(s.RawDstAddr) >= HostLenSVC
+// @ requires  acc(sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr)), R15)
+// @ ensures   acc(&s.DstAddrType, R20) && acc(&s.RawDstAddr, R20)
+// @ ensures   acc(sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr)), R15)
+// @ ensures   err == nil ==> IsHostTypeIP(res)  || IsHostTypeSVC(res)
+// @ ensures   err != nil ==> err.ErrorMem()
 // @ decreases
 func (s *SCION) DstAddr() (res addr.Host, err error) {
 	return ParseAddr(s.DstAddrType, s.RawDstAddr)
@@ -622,9 +621,8 @@ func (s *SCION) DstAddr() (res addr.Host, err error) {
 // @ requires  s.SrcAddrType == T4Svc ==> len(s.RawSrcAddr) >= HostLenSVC
 // @ requires  acc(sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr)), R15)
 // @ ensures   acc(&s.SrcAddrType, R20) && acc(&s.RawSrcAddr, R20)
-// @ ensures  err == nil ==> IsHostTypeIP(res)  || IsHostTypeSVC(res)
-// @ ensures   err != nil ==>
-// @ 	acc(sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr)), R15)
+// @ ensures   acc(sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr)), R15)
+// @ ensures   err == nil ==> IsHostTypeIP(res)  || IsHostTypeSVC(res)
 // @ ensures   err != nil ==> err.ErrorMem()
 // @ decreases
 func (s *SCION) SrcAddr() (res addr.Host, err error) {
@@ -632,13 +630,11 @@ func (s *SCION) SrcAddr() (res addr.Host, err error) {
 }
 
 // SetDstAddr sets the destination address and updates the DstAddrType field accordingly.
-// @ requires  acc(&s.RawDstAddr)
-// @ requires  acc(&s.DstAddrType)
+// @ preserves acc(&s.RawDstAddr) && acc(&s.DstAddrType)
 // @ ensures   IsHostTypeSVC(dst) ==> res == nil
-// @ ensures   acc(&s.RawDstAddr) && acc(&s.DstAddrType)
-// @ ensures   res != nil ==> res.ErrorMem()
 // @ ensures   res == nil ==> IsHostTypeIP(dst) || IsHostTypeSVC(dst)
-// @ ensures   res == nil ==> sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr))
+// @ ensures   res != nil ==> res.ErrorMem()
+// @ ensures   sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr))
 // @ decreases
 func (s *SCION) SetDstAddr(dst addr.Host) (res error) {
 	var err error
@@ -647,13 +643,11 @@ func (s *SCION) SetDstAddr(dst addr.Host) (res error) {
 }
 
 // SetSrcAddr sets the source address and updates the DstAddrType field accordingly.
-// @ requires  acc(&s.RawSrcAddr)
-// @ requires  acc(&s.SrcAddrType)
+// @ preserves acc(&s.RawSrcAddr) && acc(&s.SrcAddrType)
 // @ ensures   IsHostTypeSVC(src) ==> res == nil
-// @ ensures   acc(&s.RawSrcAddr) && acc(&s.SrcAddrType)
-// @ ensures   res != nil ==> res.ErrorMem()
 // @ ensures   res == nil ==> IsHostTypeIP(src) || IsHostTypeSVC(src)
-// @ ensures   res == nil ==> sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr))
+// @ ensures   res != nil ==> res.ErrorMem()
+// @ ensures   sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr))
 // @ decreases
 func (s *SCION) SetSrcAddr(src addr.Host) (res error) {
 	var err error
@@ -661,11 +655,10 @@ func (s *SCION) SetSrcAddr(src addr.Host) (res error) {
 	return err
 }
 
-// @ requires addrType == T4Svc ==> len(raw) >= HostLenSVC
-// @ requires acc(sl.Bytes(raw, 0, len(raw)), R15)
-// @ ensures  err == nil ==> IsHostTypeIP(res) || IsHostTypeSVC(res)
-// @ ensures  acc(sl.Bytes(raw, 0, len(raw)), R15)
-// @ ensures  err != nil ==> err.ErrorMem()
+// @ requires  addrType == T4Svc ==> len(raw) >= HostLenSVC
+// @ preserves acc(sl.Bytes(raw, 0, len(raw)), R15)
+// @ ensures   err == nil ==> IsHostTypeIP(res) || IsHostTypeSVC(res)
+// @ ensures   err != nil ==> err.ErrorMem()
 // @ decreases
 func ParseAddr(addrType AddrType, raw []byte) (res addr.Host, err error) {
 	switch addrType {
@@ -691,14 +684,14 @@ func ParseAddr(addrType AddrType, raw []byte) (res addr.Host, err error) {
 		"type", addrType, "len", addrType.Length())
 }
 
-// @ ensures   IsHostTypeSVC(host) ==> err == nil
-// @ ensures   err == nil ==> IsHostTypeIP(host) || IsHostTypeSVC(host)
-// @ ensures   err != nil ==> err.ErrorMem()
-// @ ensures   err == nil ==> sl.Bytes(b, 0, len(b))
-// @ decreases
 // (VerifiedSCION) Gobra does not support break inside switch statement.
 // Therefore the function is here marked as trusted while the body is verified in scion_test.gobra separately.
 // This is done s.t. we do not need to rewrite the actual code.
+// @ ensures   IsHostTypeSVC(host) ==> err == nil
+// @ ensures   sl.Bytes(b, 0, len(b))
+// @ ensures   err == nil ==> IsHostTypeIP(host) || IsHostTypeSVC(host)
+// @ ensures   err != nil ==> err.ErrorMem()
+// @ decreases
 // @ trusted
 func PackAddr(host addr.Host) (addrtyp AddrType, b []byte, err error) {
 	switch host.Type() {

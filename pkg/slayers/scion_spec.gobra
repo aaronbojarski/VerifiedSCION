@@ -34,9 +34,7 @@ import (
 	"verification/utils/seqs"
 )
 
-const (
-	HostLenSVC = 2
-)
+const HostLenSVC = 2
 
 pred PathPoolMem(pathPool []path.Path, pathPoolRaw path.Path) {
 	// non-initialized path pool:
