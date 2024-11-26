@@ -656,8 +656,7 @@ func (s *SCION) SetSrcAddr(src addr.Host) (res error) {
 }
 
 // @ requires  addrType == T4Svc ==> len(raw) >= HostLenSVC
-// @ requires  acc(sl.Bytes(raw, 0, len(raw)), R15)
-// @ ensures   acc(sl.Bytes(raw, 0, len(raw)), R15)
+// @ preserves acc(sl.Bytes(raw, 0, len(raw)), R15)
 // @ ensures   err == nil ==> IsHostTypeIP(res) || IsHostTypeSVC(res)
 // @ ensures   err != nil ==> err.ErrorMem()
 // @ decreases
