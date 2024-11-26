@@ -378,9 +378,9 @@ func (s *SCION) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) (res er
 	s.PathType = path.Type(data[8])
 	// @ assert 0 <= s.PathType && s.PathType < 256
 	s.DstAddrType = AddrType(data[9] >> 4 & 0xF)
-	// @ assert int(s.DstAddrType) == b.BitAndF(int(data[9] >> 4))
+	// @ assert byte(s.DstAddrType) == b.BitAndF(data[9] >> 4)
 	s.SrcAddrType = AddrType(data[9] & 0xF)
-	// @ assert int(s.SrcAddrType) == b.BitAndF(int(data[9]))
+	// @ assert byte(s.SrcAddrType) == b.BitAndF(data[9])
 	// @ fold acc(sl.Bytes(data, 0, len(data)), R41)
 	// @ )
 
