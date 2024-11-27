@@ -66,6 +66,23 @@ preserves acc(c.Mem(), _)
 preserves acc(sl.Bytes(b, 0, len(b)), R15)
 ensures   err == nil ==> 0 <= n && n <= len(b)
 ensures   err != nil ==> err.ErrorMem()
+func (c *connUDPIPv4) Write(b []byte) (n int, err error) {
+	unfold acc(c.Mem(), _)
+	unfold acc(c.connUDPBase.MemWithoutConn(), _)
+	assert c.pconn.GetUnderlyingConn() == c.conn
+	tmpImpl := c.conn
+	tmpItf := c.pconn.ExchangeWildcardPerm()
+	var packetconn *ipv4.PacketConn = c.pconn
+	assert tmpItf == c.conn
+	fold acc(c.connUDPBase.Mem(), _)
+	n1, err1 := c.connUDPBase.Write(b, tmpImpl)
+	return n1, err1
+}
+
+preserves acc(c.Mem(), _)
+preserves acc(sl.Bytes(b, 0, len(b)), R15)
+ensures   err == nil ==> 0 <= n && n <= len(b)
+ensures   err != nil ==> err.ErrorMem()
 func (c *connUDPIPv4) WriteTo(b []byte, dst netip.AddrPort) (n int, err error) {
 	unfold acc(c.Mem(), _)
 	unfold acc(c.connUDPBase.MemWithoutConn(), _)
@@ -109,6 +126,23 @@ func (c *connUDPIPv4) Close() (err error) {
 
 /** Lift methods in *connUDPBase to *connUDPIPv6 **/
 *connUDPIPv6 implements Conn
+
+preserves acc(c.Mem(), _)
+preserves acc(sl.Bytes(b, 0, len(b)), R15)
+ensures   err == nil ==> 0 <= n && n <= len(b)
+ensures   err != nil ==> err.ErrorMem()
+func (c *connUDPIPv6) Write(b []byte) (n int, err error) {
+	unfold acc(c.Mem(), _)
+	unfold acc(c.connUDPBase.MemWithoutConn(), _)
+	assert c.pconn.GetUnderlyingConn() == c.conn
+	tmpImpl := c.conn
+	tmpItf := c.pconn.ExchangeWildcardPerm()
+	var packetconn *ipv6.PacketConn = c.pconn
+	assert tmpItf == c.conn
+	fold acc(c.connUDPBase.Mem(), _)
+	n1, err1 := c.connUDPBase.Write(b, tmpImpl)
+	return n1, err1
+}
 
 preserves acc(c.Mem(), _)
 preserves acc(sl.Bytes(b, 0, len(b)), R15)
