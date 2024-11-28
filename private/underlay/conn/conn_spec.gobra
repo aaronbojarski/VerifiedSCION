@@ -59,6 +59,13 @@ pred (c *Config) Mem() {
 	0 <= c.ReceiveBufferSize
 }
 
+pure
+requires acc(c.Mem(), _)
+decreases
+func (c *connUDPBase) GetUnderlyingConn() *net.UDPConn {
+	return unfolding acc(c.Mem(), _) in c.conn
+}
+
 /** Lift methods in *connUDPBase to *connUDPIPv4 **/
 *connUDPIPv4 implements Conn
 
@@ -70,12 +77,11 @@ func (c *connUDPIPv4) Write(b []byte) (n int, err error) {
 	unfold acc(c.Mem(), _)
 	unfold acc(c.connUDPBase.MemWithoutConn(), _)
 	assert c.pconn.GetUnderlyingConn() == c.conn
-	tmpImpl := c.conn
 	tmpItf := c.pconn.ExchangeWildcardPerm()
 	var packetconn *ipv4.PacketConn = c.pconn
 	assert tmpItf == c.conn
 	fold acc(c.connUDPBase.Mem(), _)
-	n1, err1 := c.connUDPBase.Write(b, tmpImpl)
+	n1, err1 := c.connUDPBase.Write(b)
 	return n1, err1
 }
 
@@ -87,12 +93,11 @@ func (c *connUDPIPv4) WriteTo(b []byte, dst netip.AddrPort) (n int, err error) {
 	unfold acc(c.Mem(), _)
 	unfold acc(c.connUDPBase.MemWithoutConn(), _)
 	assert c.pconn.GetUnderlyingConn() == c.conn
-	tmpImpl := c.conn
 	tmpItf := c.pconn.ExchangeWildcardPerm()
 	var packetconn *ipv4.PacketConn = c.pconn
 	assert tmpItf == c.conn
 	fold acc(c.connUDPBase.Mem(), _)
-	n1, err1 := c.connUDPBase.WriteTo(b, dst, tmpImpl)
+	n1, err1 := c.connUDPBase.WriteTo(b, dst)
 	return n1, err1
 }
 
@@ -135,12 +140,11 @@ func (c *connUDPIPv6) Write(b []byte) (n int, err error) {
 	unfold acc(c.Mem(), _)
 	unfold acc(c.connUDPBase.MemWithoutConn(), _)
 	assert c.pconn.GetUnderlyingConn() == c.conn
-	tmpImpl := c.conn
 	tmpItf := c.pconn.ExchangeWildcardPerm()
 	var packetconn *ipv6.PacketConn = c.pconn
 	assert tmpItf == c.conn
 	fold acc(c.connUDPBase.Mem(), _)
-	n1, err1 := c.connUDPBase.Write(b, tmpImpl)
+	n1, err1 := c.connUDPBase.Write(b)
 	return n1, err1
 }
 
@@ -152,12 +156,11 @@ func (c *connUDPIPv6) WriteTo(b []byte, dst netip.AddrPort) (n int, err error) {
 	unfold acc(c.Mem(), _)
 	unfold acc(c.connUDPBase.MemWithoutConn(), _)
 	assert c.pconn.GetUnderlyingConn() == c.conn
-	tmpImpl := c.conn
 	tmpItf := c.pconn.ExchangeWildcardPerm()
 	var packetconn *ipv6.PacketConn = c.pconn
 	assert tmpItf == c.conn
 	fold acc(c.connUDPBase.Mem(), _)
-	n1, err1 := c.connUDPBase.WriteTo(b, dst, tmpImpl)
+	n1, err1 := c.connUDPBase.WriteTo(b, dst)
 	return n1, err1
 }
 

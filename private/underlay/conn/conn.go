@@ -378,20 +378,20 @@ func (cc *connUDPBase) initConnUDP(
 
 // @ preserves acc(c.Mem(), _)
 // @ preserves acc(sl.Bytes(b, 0, len(b)), R15)
-// @ preserves unfolding acc(c.Mem(), _) in c.conn == underlyingConn
+// @ ensures   c.GetUnderlyingConn() == old(c.GetUnderlyingConn())
 // @ ensures   err == nil ==> 0 <= n && n <= len(b)
 // @ ensures   err != nil ==> err.ErrorMem()
-func (c *connUDPBase) Write(b []byte /*@, ghost underlyingConn *net.UDPConn @*/) (n int, err error) {
+func (c *connUDPBase) Write(b []byte) (n int, err error) {
 	//@ unfold acc(c.Mem(), _)
 	return c.conn.Write(b)
 }
 
 // @ preserves acc(c.Mem(), _)
-// @ preserves unfolding acc(c.Mem(), _) in c.conn == underlyingConn
 // @ preserves acc(sl.Bytes(b, 0, len(b)), R15)
+// @ ensures   c.GetUnderlyingConn() == old(c.GetUnderlyingConn())
 // @ ensures   err == nil ==> 0 <= n && n <= len(b)
 // @ ensures   err != nil ==> err.ErrorMem()
-func (c *connUDPBase) WriteTo(b []byte, dst netip.AddrPort /*@, ghost underlyingConn *net.UDPConn @*/) (n int, err error) {
+func (c *connUDPBase) WriteTo(b []byte, dst netip.AddrPort) (n int, err error) {
 	//@ unfold acc(c.Mem(), _)
 	if c.Remote.IsValid() {
 		return c.conn.Write(b)
