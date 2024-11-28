@@ -97,7 +97,7 @@ type Config struct {
 //
 // The config can be used to customize socket behavior.
 // @ requires cfg.Mem()
-// @ requires listen.IsValid() || remote.IsValid()
+// @ requires listen.IsValidSpec() || remote.IsValidSpec()
 // @ ensures  e == nil ==> res.Mem()
 // @ ensures  e != nil ==> e.ErrorMem()
 // @ decreases
@@ -109,8 +109,8 @@ func New(listen, remote netip.AddrPort, cfg *Config) (res Conn, e error) {
 	if !a.IsValid() {
 		panic("either listen or remote must be set")
 	}
-	// @ assert remote.IsValid() ==> a == remote
-	// @ assert !remote.IsValid() ==> a == listen
+	// @ assert remote.IsValidSpec() ==> a == remote
+	// @ assert !remote.IsValidSpec() ==> a == listen
 	if a.Addr().Is4() {
 		return newConnUDPIPv4(listen, remote, cfg)
 	}
