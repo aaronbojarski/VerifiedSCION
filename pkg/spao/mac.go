@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +gobra
+
 package spao
 
 import (
@@ -29,6 +31,8 @@ import (
 	"github.com/scionproto/scion/pkg/slayers/path/epic"
 	"github.com/scionproto/scion/pkg/slayers/path/onehop"
 	"github.com/scionproto/scion/pkg/slayers/path/scion"
+	// @ . "github.com/scionproto/scion/verification/utils/definitions"
+	// @ sl "github.com/scionproto/scion/verification/utils/slices"
 )
 
 const (
@@ -66,11 +70,18 @@ type MACInput struct {
 // It must be at least MACBufferSize long.
 // The resulting MAC is written to outBuffer (appending, if necessary),
 // and returned as a slice of length 16.
+
+// @ preserves sl.Bytes(auxBuffer, 0, len(auxBuffer))
+// @ preserves sl.Bytes(outBuffer, 0, len(outBuffer))
+// @ ensures   sl.Bytes(b, 0, len(b))
+// @ ensures   retErr != nil ==> retErr.ErrorMem()
+// @ decreases
 func ComputeAuthCMAC(
 	input MACInput,
 	auxBuffer []byte,
 	outBuffer []byte,
-) ([]byte, error) {
+	/*@ ghost ubuf []byte, @*/
+) (b []byte, retErr error) {
 
 	cmac, err := initCMAC(input.Key)
 	if err != nil {
@@ -82,6 +93,7 @@ func ComputeAuthCMAC(
 		input.Header,
 		input.PldType,
 		input.Pld,
+		/*@ ubuf, @*/
 	)
 	if err != nil {
 		return nil, err
@@ -91,7 +103,10 @@ func ComputeAuthCMAC(
 	return cmac.Sum(outBuffer[:0]), nil
 }
 
-func initCMAC(key []byte) (hash.Hash, error) {
+// @ requires  acc(sl.Bytes(key, 0, len(key)), _)
+// @ ensures   retErr != nil ==> retErr.ErrorMem()
+// @ decreases
+func initCMAC(key []byte) (m hash.Hash, retErr error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, serrors.Wrap("unable to initialize AES cipher", err)
@@ -103,17 +118,23 @@ func initCMAC(key []byte) (hash.Hash, error) {
 	return mac, nil
 }
 
+// @ requires  acc(s, _)
+// @ requires  acc(pld, _)
+// @ preserves sl.Bytes(buf, 0, len(buf))
+// @ ensures   retErr != nil ==> retErr.ErrorMem()
+// @ decreases
 func serializeAuthenticatedData(
 	buf []byte,
 	s *slayers.SCION,
 	opt slayers.PacketAuthOption,
 	pldType slayers.L4ProtocolType,
 	pld []byte,
-) (int, error) {
+	/*@ ghost ubuf []byte, @*/
+) (n int, retErr error) {
 
 	_ = buf[MACBufferSize-1]
 
-	hdrLen := slayers.CmnHdrLen + s.AddrHdrLen() + s.Path.Len()
+	hdrLen := slayers.CmnHdrLen + s.AddrHdrLen( /*@ ubuf, false @*/ ) + s.Path.Len( /*@ ubuf @*/ )
 	if hdrLen > slayers.MaxHdrLen {
 		return 0, serrors.New("SCION header length exceeds maximum",
 			"max", slayers.MaxHdrLen, "actual", hdrLen)
@@ -144,23 +165,27 @@ func serializeAuthenticatedData(
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
 			opt.SPI().Direction() == slayers.PacketAuthReceiverSide) {
-		offset += copy(buf[offset:], s.RawDstAddr)
+		offset += copy(buf[offset:], s.RawDstAddr /*@ , R20 @*/)
 	}
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
 			opt.SPI().Direction() == slayers.PacketAuthSenderSide) {
-		offset += copy(buf[offset:], s.RawSrcAddr)
+		offset += copy(buf[offset:], s.RawSrcAddr /*@ , R20 @*/)
 	}
-	err := zeroOutMutablePath(s.Path, buf[offset:])
+	err := zeroOutMutablePath(s.Path, buf[offset:] /*@, ubuf @*/)
 	if err != nil {
 		return 0, err
 	}
-	offset += s.Path.Len()
+	offset += s.Path.Len( /*@ ubuf @*/ )
 	return offset, nil
 }
 
-func zeroOutMutablePath(orig path.Path, buf []byte) error {
-	err := orig.SerializeTo(buf)
+// @ requires  orig.Mem(ubuf)
+// @ preserves sl.Bytes(buf, 0, len(buf))
+// @ ensures   retErr != nil ==> retErr.ErrorMem()
+// @ decreases
+func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (retErr error) {
+	err := orig.SerializeTo(buf /*@, ubuf @*/)
 	if err != nil {
 		return serrors.Wrap("serializing path for resetting fields", err)
 	}
@@ -182,13 +207,15 @@ func zeroOutMutablePath(orig path.Path, buf []byte) error {
 		// Zero out HF.Flags&&Alerts
 		buf[8] = 0
 		// Zero out second HF
-		copy(buf[20:], []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+		copy(buf[20:], []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} /*@ , R20 @*/)
 		return nil
 	default:
 		return serrors.New(fmt.Sprintf("unknown path type %T", orig))
 	}
 }
 
+// @ preserves sl.Bytes(buf, 0, len(buf))
+// @ decreases
 func zeroOutWithBase(base scion.Base, buf []byte) {
 	// Zero out CurrInf && CurrHF
 	offset := 0
@@ -208,6 +235,8 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 	}
 }
 
+// @ preserves sl.Bytes(b, 0, 6)
+// @ decreases
 func bigEndianPutUint48(b []byte, v uint64) {
 	b[0] = byte(v >> 40)
 	b[1] = byte(v >> 32)
