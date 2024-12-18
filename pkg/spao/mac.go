@@ -71,6 +71,7 @@ type MACInput struct {
 // The resulting MAC is written to outBuffer (appending, if necessary),
 // and returned as a slice of length 16.
 
+// @ requires  acc(sl.Bytes(input.Key, 0, len(input.Key)), R50)
 // @ preserves sl.Bytes(auxBuffer, 0, len(auxBuffer))
 // @ preserves sl.Bytes(outBuffer, 0, len(outBuffer))
 // @ ensures   sl.Bytes(b, 0, len(b))
@@ -103,7 +104,7 @@ func ComputeAuthCMAC(
 	return cmac.Sum(outBuffer[:0]), nil
 }
 
-// @ requires  acc(sl.Bytes(key, 0, len(key)), _)
+// @ requires  acc(sl.Bytes(key, 0, len(key)), R50)
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func initCMAC(key []byte) (m hash.Hash, retErr error) {
@@ -118,9 +119,13 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 	return mac, nil
 }
 
-// @ requires  acc(s, _)
+// @ requires  s != nil
 // @ requires  acc(pld, _)
+// @ requires  len(buf) >= MACBufferSize
 // @ preserves sl.Bytes(buf, 0, len(buf))
+// @ preserves acc(s, R50)
+// @ preserves acc(s.Mem(ubuf), R50)
+// @ preserves acc(s.Path.Mem(ubuf), R50)
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func serializeAuthenticatedData(
@@ -132,8 +137,10 @@ func serializeAuthenticatedData(
 	/*@ ghost ubuf []byte, @*/
 ) (n int, retErr error) {
 
+	// @ unfold sl.Bytes(buf, 0, len(buf))
+	// @ defer fold sl.Bytes(buf, 0, len(buf))
 	_ = buf[MACBufferSize-1]
-
+	// TODO: need to unfold acc(s.Mem(ubuf), R50) for s.Path.Len but not for s.AddrHdrLen
 	hdrLen := slayers.CmnHdrLen + s.AddrHdrLen( /*@ ubuf, false @*/ ) + s.Path.Len( /*@ ubuf @*/ )
 	if hdrLen > slayers.MaxHdrLen {
 		return 0, serrors.New("SCION header length exceeds maximum",
@@ -180,12 +187,17 @@ func serializeAuthenticatedData(
 	return offset, nil
 }
 
-// @ requires  orig.Mem(ubuf)
+// @ requires  orig != nil
+// @ requires  len(buf) >= 32
+// @ preserves acc(orig.Mem(ubuf), R1)
+// @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (retErr error) {
 	err := orig.SerializeTo(buf /*@, ubuf @*/)
+	// @ unfold acc(orig.Mem(ubuf), R1)
+	// @ defer fold acc(orig.Mem(ubuf), R1)
 	if err != nil {
 		return serrors.Wrap("serializing path for resetting fields", err)
 	}
@@ -203,26 +215,39 @@ func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (
 		return nil
 	case *onehop.Path:
 		// Zero out IF.SegID
+		// @ unfold sl.Bytes(buf, 0, len(buf))
+		// @ assert forall j int :: { &buf[2:][j] } 0 <= 2 ==> &buf[2:][j] == &buf[2 + j]
 		binary.BigEndian.PutUint16(buf[2:], 0)
 		// Zero out HF.Flags&&Alerts
 		buf[8] = 0
 		// Zero out second HF
+		// @ assert forall j int :: { &buf[20:][j] } 0 <= 12 ==> &buf[20:][j] == &buf[20 + j]
 		copy(buf[20:], []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} /*@ , R20 @*/)
+		// @ fold sl.Bytes(buf, 0, len(buf))
 		return nil
 	default:
 		return serrors.New(fmt.Sprintf("unknown path type %T", orig))
 	}
 }
 
+// @ requires  len(buf) >= MACBufferSize - epic.MetadataLen
+// @ requires  base.WeaklyValid()
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ decreases
 func zeroOutWithBase(base scion.Base, buf []byte) {
 	// Zero out CurrInf && CurrHF
 	offset := 0
+	// @ unfold sl.Bytes(buf, 0, len(buf))
 	buf[offset] = 0
 	offset += 4
+	// @ invariant 0 <= i && i <= base.NumINF
+	// @ invariant offset == 4 + 8*i
+	// @ invariant 4 <= offset && offset <= 28
+	// @ decreases base.NumINF - i
 	for i := 0; i < base.NumINF; i++ {
 		// Zero out IF.SegID
+		// @ assert forall j int :: { &buf[offset+2:][j] } 0 <= j && j < len(buf[offset+2:]) ==>
+		// @ 	&buf[offset+2:][j] == &buf[offset+2+j]
 		binary.BigEndian.PutUint16(buf[offset+2:], 0)
 		offset += 8
 	}
@@ -233,12 +258,17 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 			offset += 12
 		}
 	}
+	// @ fold sl.Bytes(buf, 0, len(buf))
 }
 
+// @ requires  len(b) >= 6
 // @ preserves sl.Bytes(b, 0, 6)
 // @ decreases
 func bigEndianPutUint48(b []byte, v uint64) {
+	// @ unfold sl.Bytes(b, 0, 6)
 	b[0] = byte(v >> 40)
 	b[1] = byte(v >> 32)
+	//@ assert forall j int :: { &b[2:6][j] } 0 <= 4 ==> &b[2:6][j] == &b[2 + j]
 	binary.BigEndian.PutUint32(b[2:6], uint32(v))
+	// @ fold sl.Bytes(b, 0, 6)
 }

@@ -15,5 +15,6 @@ import (
 )
 
 
+ensures err != nil ==> err.ErrorMem()
 decreases
-func New(c cipher.Block) (hash.Hash, error)
+func New(c cipher.Block) (h hash.Hash, err error)
