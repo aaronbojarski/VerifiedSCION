@@ -123,9 +123,9 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 // @ requires  acc(pld, _)
 // @ requires  len(buf) >= MACBufferSize
 // @ preserves sl.Bytes(buf, 0, len(buf))
-// @ preserves acc(s, R50)
-// @ preserves acc(s.Mem(ubuf), R50)
-// @ preserves acc(s.Path.Mem(ubuf), R50)
+// @ preserves acc(s, R49)
+// @ preserves acc(s.Mem(ubuf), R49)
+// @ preserves acc(s.Path.Mem(ubuf), R49)
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func serializeAuthenticatedData(
@@ -138,48 +138,63 @@ func serializeAuthenticatedData(
 ) (n int, retErr error) {
 
 	// @ unfold sl.Bytes(buf, 0, len(buf))
-	// @ defer fold sl.Bytes(buf, 0, len(buf))
 	_ = buf[MACBufferSize-1]
-	// TODO: need to unfold acc(s.Mem(ubuf), R50) for s.Path.Len but not for s.AddrHdrLen
+	// @ unfold acc(s.Mem(ubuf), R50)
+	// @ defer fold acc(s.Mem(ubuf), R50)
 	hdrLen := slayers.CmnHdrLen + s.AddrHdrLen( /*@ ubuf, false @*/ ) + s.Path.Len( /*@ ubuf @*/ )
 	if hdrLen > slayers.MaxHdrLen {
+		// @ fold sl.Bytes(buf, 0, len(buf))
 		return 0, serrors.New("SCION header length exceeds maximum",
 			"max", slayers.MaxHdrLen, "actual", hdrLen)
 	}
 	if hdrLen%slayers.LineLen != 0 {
+		// @ fold sl.Bytes(buf, 0, len(buf))
 		return 0, serrors.New("SCION header length is not an integer multiple of line length",
 			"actual", hdrLen)
 	}
 
 	buf[0] = byte(hdrLen / slayers.LineLen)
 	buf[1] = byte(pldType)
+	// @ assert forall j int :: { &buf[2:][j] } 0 <= 2 ==> &buf[2:][j] == &buf[2 + j]
 	binary.BigEndian.PutUint16(buf[2:], uint16(len(pld)))
 	buf[4] = byte(opt.Algorithm())
 	buf[5] = byte(0)
+	//@ assert forall j int :: { &buf[6:12][j] } 0 <= 6 ==> &buf[6:12][j] == &buf[6 + j]
 	bigEndianPutUint48(buf[6:12], opt.TimestampSN())
 	firstHdrLine := uint32(s.Version&0xF)<<28 | uint32(s.TrafficClass&0x3f)<<20 | s.FlowID&0xFFFFF
+	// @ assert forall j int :: { &buf[12:][j] } 0 <= 4 ==> &buf[12:][j] == &buf[12 + j]
 	binary.BigEndian.PutUint32(buf[12:], firstHdrLine)
 	buf[16] = byte(s.PathType)
 	buf[17] = byte(s.DstAddrType&0xF)<<4 | byte(s.SrcAddrType&0xF)
+	// @ assert forall j int :: { &buf[18:][j] } 0 <= 2 ==> &buf[18:][j] == &buf[18 + j]
 	binary.BigEndian.PutUint16(buf[18:], 0)
 	offset := fixAuthDataInputLen
 
 	if !opt.SPI().IsDRKey() {
+		// @ assert forall j int :: { &buf[offset:][j] } 0 <= 8 ==> &buf[offset:][j] == &buf[offset + j]
 		binary.BigEndian.PutUint64(buf[offset:], uint64(s.DstIA))
+		// @ assert forall j int :: { &buf[offset+8:][j] } 0 <= 8 ==> &buf[offset+8:][j] == &buf[offset+8 + j]
 		binary.BigEndian.PutUint64(buf[offset+8:], uint64(s.SrcIA))
 		offset += 16
 	}
+	// @ fold sl.Bytes(buf, 0, len(buf))
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
 			opt.SPI().Direction() == slayers.PacketAuthReceiverSide) {
+		// @ sl.SplitRange_Bytes(buf, offset, len(buf), writePerm)
 		offset += copy(buf[offset:], s.RawDstAddr /*@ , R20 @*/)
+		// @ sl.CombineRange_Bytes(buf, offset, len(buf), writePerm)
 	}
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
 			opt.SPI().Direction() == slayers.PacketAuthSenderSide) {
+		// @ sl.SplitRange_Bytes(buf, offset, len(buf), writePerm)
 		offset += copy(buf[offset:], s.RawSrcAddr /*@ , R20 @*/)
+		// @ sl.CombineRange_Bytes(buf, offset, len(buf), writePerm)
 	}
+	// @ sl.SplitRange_Bytes(buf, offset, len(buf), writePerm)
 	err := zeroOutMutablePath(s.Path, buf[offset:] /*@, ubuf @*/)
+	// @ sl.CombineRange_Bytes(buf, offset, len(buf), writePerm)
 	if err != nil {
 		return 0, err
 	}
@@ -188,7 +203,7 @@ func serializeAuthenticatedData(
 }
 
 // @ requires  orig != nil
-// @ requires  len(buf) >= 32
+// @ requires  len(buf) >= MACBufferSize
 // @ preserves acc(orig.Mem(ubuf), R1)
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves sl.Bytes(buf, 0, len(buf))
@@ -196,8 +211,6 @@ func serializeAuthenticatedData(
 // @ decreases
 func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (retErr error) {
 	err := orig.SerializeTo(buf /*@, ubuf @*/)
-	// @ unfold acc(orig.Mem(ubuf), R1)
-	// @ defer fold acc(orig.Mem(ubuf), R1)
 	if err != nil {
 		return serrors.Wrap("serializing path for resetting fields", err)
 	}
@@ -205,13 +218,29 @@ func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (
 	case empty.Path:
 		return nil
 	case *scion.Raw:
+		// @ unfold acc(p.Mem(ubuf), R1)
+		// @ unfold acc(p.Base.Mem(), R1)
 		zeroOutWithBase(p.Base, buf)
+		// @ fold acc(p.Base.Mem(), R1)
+		// @ fold acc(p.Mem(ubuf), R1)
 		return nil
 	case *scion.Decoded:
+		// @ unfold acc(p.Mem(ubuf), R1)
+		// @ unfold acc(p.Base.Mem(), R1)
 		zeroOutWithBase(p.Base, buf)
+		// @ fold acc(p.Base.Mem(), R1)
+		// @ fold acc(p.Mem(ubuf), R1)
 		return nil
 	case *epic.Path:
+		// @ unfold acc(p.Mem(ubuf), R1)
+		// @ unfold acc(p.ScionPath.Mem(ubuf[epic.MetadataLen:]), R1)
+		// @ unfold acc(p.ScionPath.Base.Mem(), R1)
+		// @ sl.SplitRange_Bytes(buf, epic.MetadataLen, len(buf), writePerm)
 		zeroOutWithBase(p.ScionPath.Base, buf[epic.MetadataLen:])
+		// @ sl.CombineRange_Bytes(buf, epic.MetadataLen, len(buf), writePerm)
+		// @ fold acc(p.ScionPath.Base.Mem(), R1)
+		// @ fold acc(p.ScionPath.Mem(ubuf[epic.MetadataLen:]), R1)
+		// @ fold acc(p.Mem(ubuf), R1)
 		return nil
 	case *onehop.Path:
 		// Zero out IF.SegID
@@ -231,7 +260,6 @@ func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (
 }
 
 // @ requires  len(buf) >= MACBufferSize - epic.MetadataLen
-// @ requires  base.WeaklyValid()
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ decreases
 func zeroOutWithBase(base scion.Base, buf []byte) {
@@ -239,36 +267,49 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 	offset := 0
 	// @ unfold sl.Bytes(buf, 0, len(buf))
 	buf[offset] = 0
+	// @ fold sl.Bytes(buf, 0, len(buf))
 	offset += 4
+
 	// @ invariant 0 <= i && i <= base.NumINF
 	// @ invariant offset == 4 + 8*i
 	// @ invariant 4 <= offset && offset <= 28
+	// @ invariant sl.Bytes(buf, 0, len(buf))
 	// @ decreases base.NumINF - i
 	for i := 0; i < base.NumINF; i++ {
 		// Zero out IF.SegID
+		// @ unfold sl.Bytes(buf, 0, len(buf))
 		// @ assert forall j int :: { &buf[offset+2:][j] } 0 <= j && j < len(buf[offset+2:]) ==>
 		// @ 	&buf[offset+2:][j] == &buf[offset+2+j]
 		binary.BigEndian.PutUint16(buf[offset+2:], 0)
+		// @ fold sl.Bytes(buf, 0, len(buf))
 		offset += 8
 	}
+	// @ invariant 0 <= i && i <= base.NumINF
+	// @ invariant offset == old(offset) + 12 * int(base.PathMeta.SegLen[i])
+	// @ invariant sl.Bytes(buf, 0, len(buf))
+	// @ decreases base.NumINF - i
 	for i := 0; i < base.NumINF; i++ {
+		// @ invariant 0 <= j && j <= int(base.PathMeta.SegLen[i])
+		// @ invariant offset == old(offset) + 12 * j
+		// @ invariant sl.Bytes(buf, 0, len(buf))
+		// @ decreases int(base.PathMeta.SegLen[i]) - j
 		for j := 0; j < int(base.PathMeta.SegLen[i]); j++ {
 			// Zero out HF.Flags&&Alerts
+			// @ unfold sl.Bytes(buf, 0, len(buf))
 			buf[offset] = 0
+			// @ fold sl.Bytes(buf, 0, len(buf))
 			offset += 12
 		}
 	}
 	// @ fold sl.Bytes(buf, 0, len(buf))
 }
 
-// @ requires  len(b) >= 6
-// @ preserves sl.Bytes(b, 0, 6)
+// @ requires len(b) >= 6
+// @ preserves acc(&b[0]) && acc(&b[1]) && acc(&b[2]) && acc(&b[3]) && acc(&b[4]) && acc(&b[5])
 // @ decreases
 func bigEndianPutUint48(b []byte, v uint64) {
-	// @ unfold sl.Bytes(b, 0, 6)
 	b[0] = byte(v >> 40)
 	b[1] = byte(v >> 32)
 	//@ assert forall j int :: { &b[2:6][j] } 0 <= 4 ==> &b[2:6][j] == &b[2 + j]
 	binary.BigEndian.PutUint32(b[2:6], uint32(v))
-	// @ fold sl.Bytes(b, 0, 6)
 }

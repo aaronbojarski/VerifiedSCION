@@ -68,6 +68,7 @@ const (
 // range [1, 2^21-1].
 type PacketAuthSPI uint32
 
+// @ decreases
 func (p PacketAuthSPI) Type() uint8 {
 	if p&(1<<17) == 0 {
 		return PacketAuthASHost
@@ -75,6 +76,7 @@ func (p PacketAuthSPI) Type() uint8 {
 	return PacketAuthHostHost
 }
 
+// @ decreases
 func (p PacketAuthSPI) Direction() uint8 {
 	if p&(1<<16) == 0 {
 		return PacketAuthSenderSide
@@ -82,10 +84,12 @@ func (p PacketAuthSPI) Direction() uint8 {
 	return PacketAuthReceiverSide
 }
 
+// @ decreases
 func (p PacketAuthSPI) DRKeyProto() uint16 {
 	return uint16(p)
 }
 
+// @ decreases
 func (p PacketAuthSPI) IsDRKey() bool {
 	return p > 0 && p < (1<<21)
 }
@@ -195,16 +199,19 @@ func (o PacketAuthOption) Reset(
 }
 
 // SPI returns the value set in the Security Parameter Index in the extension.
+// @ decreases
 func (o PacketAuthOption) SPI() PacketAuthSPI {
 	return PacketAuthSPI(binary.BigEndian.Uint32(o.OptData[:4]))
 }
 
 // Algorithm returns the algorithm type stored in the data buffer.
+// @ decreases
 func (o PacketAuthOption) Algorithm() PacketAuthAlg {
 	return PacketAuthAlg(o.OptData[4])
 }
 
 // Timestamp returns the value set in the homonym field in the extension.
+// @ decreases
 func (o PacketAuthOption) TimestampSN() uint64 {
 	return bigEndianUint48(o.OptData[6:12])
 }
