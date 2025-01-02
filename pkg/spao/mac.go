@@ -260,6 +260,7 @@ func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (
 }
 
 // @ requires  len(buf) >= MACBufferSize - epic.MetadataLen
+// @ requires  base.WeaklyValid()
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ decreases
 func zeroOutWithBase(base scion.Base, buf []byte) {
@@ -284,11 +285,16 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 		// @ fold sl.Bytes(buf, 0, len(buf))
 		offset += 8
 	}
+	// @ invariant base.WeaklyValid()
 	// @ invariant 0 <= i && i <= base.NumINF
-	// @ invariant offset == old(offset) + 12 * int(base.PathMeta.SegLen[i])
+	// @ invariant 4 <= offset && offset <= 28 + base.NumINF * 12 * scion.MaxHops
+	// @ invariant i == 0 ==> offset == old(offset)
+	// @ invariant i > 0 ==> offset == old(offset) + 12 * int(base.PathMeta.SegLen[i-1])
 	// @ invariant sl.Bytes(buf, 0, len(buf))
 	// @ decreases base.NumINF - i
 	for i := 0; i < base.NumINF; i++ {
+		// @ invariant base.WeaklyValid()
+		// @ invariant i < base.NumINF
 		// @ invariant 0 <= j && j <= int(base.PathMeta.SegLen[i])
 		// @ invariant offset == old(offset) + 12 * j
 		// @ invariant sl.Bytes(buf, 0, len(buf))
