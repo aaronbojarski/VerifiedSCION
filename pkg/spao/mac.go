@@ -203,8 +203,8 @@ func serializeAuthenticatedData(
 }
 
 // @ requires  orig != nil
-// @ requires  len(buf) >= MACBufferSize
-// @ preserves acc(orig.Mem(ubuf), R1)
+// @ requires  len(buf) >=  28 + 12 * scion.MaxHops + epic.MetadataLen
+// @ preserves acc(orig.Mem(ubuf), R50)
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
@@ -218,29 +218,29 @@ func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (
 	case empty.Path:
 		return nil
 	case *scion.Raw:
-		// @ unfold acc(p.Mem(ubuf), R1)
-		// @ unfold acc(p.Base.Mem(), R1)
+		// @ unfold acc(p.Mem(ubuf), R50)
+		// @ unfold acc(p.Base.Mem(), R50)
 		zeroOutWithBase(p.Base, buf)
-		// @ fold acc(p.Base.Mem(), R1)
-		// @ fold acc(p.Mem(ubuf), R1)
+		// @ fold acc(p.Base.Mem(), R50)
+		// @ fold acc(p.Mem(ubuf), R50)
 		return nil
 	case *scion.Decoded:
-		// @ unfold acc(p.Mem(ubuf), R1)
-		// @ unfold acc(p.Base.Mem(), R1)
+		// @ unfold acc(p.Mem(ubuf), R50)
+		// @ unfold acc(p.Base.Mem(), R50)
 		zeroOutWithBase(p.Base, buf)
-		// @ fold acc(p.Base.Mem(), R1)
-		// @ fold acc(p.Mem(ubuf), R1)
+		// @ fold acc(p.Base.Mem(), R50)
+		// @ fold acc(p.Mem(ubuf), R50)
 		return nil
 	case *epic.Path:
-		// @ unfold acc(p.Mem(ubuf), R1)
-		// @ unfold acc(p.ScionPath.Mem(ubuf[epic.MetadataLen:]), R1)
-		// @ unfold acc(p.ScionPath.Base.Mem(), R1)
+		// @ unfold acc(p.Mem(ubuf), R50)
+		// @ unfold acc(p.ScionPath.Mem(ubuf[epic.MetadataLen:]), R50)
+		// @ unfold acc(p.ScionPath.Base.Mem(), R50)
 		// @ sl.SplitRange_Bytes(buf, epic.MetadataLen, len(buf), writePerm)
 		zeroOutWithBase(p.ScionPath.Base, buf[epic.MetadataLen:])
 		// @ sl.CombineRange_Bytes(buf, epic.MetadataLen, len(buf), writePerm)
-		// @ fold acc(p.ScionPath.Base.Mem(), R1)
-		// @ fold acc(p.ScionPath.Mem(ubuf[epic.MetadataLen:]), R1)
-		// @ fold acc(p.Mem(ubuf), R1)
+		// @ fold acc(p.ScionPath.Base.Mem(), R50)
+		// @ fold acc(p.ScionPath.Mem(ubuf[epic.MetadataLen:]), R50)
+		// @ fold acc(p.Mem(ubuf), R50)
 		return nil
 	case *onehop.Path:
 		// Zero out IF.SegID
@@ -259,7 +259,7 @@ func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (
 	}
 }
 
-// @ requires  len(buf) >= MACBufferSize - epic.MetadataLen
+// @ requires  len(buf) >= 28 + 12 * scion.MaxHops
 // @ requires  base.WeaklyValid()
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ decreases
@@ -285,18 +285,22 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 		// @ fold sl.Bytes(buf, 0, len(buf))
 		offset += 8
 	}
+	// @ oldOffset := offset
 	// @ invariant base.WeaklyValid()
 	// @ invariant 0 <= i && i <= base.NumINF
-	// @ invariant 4 <= offset && offset <= 28 + base.NumINF * 12 * scion.MaxHops
-	// @ invariant i == 0 ==> offset == old(offset)
-	// @ invariant i > 0 ==> offset == old(offset) + 12 * int(base.PathMeta.SegLen[i-1])
+	// @ invariant i == 0 ==> offset == oldOffset
+	// @ invariant i == 1 ==> offset == oldOffset + 12 * int(base.PathMeta.SegLen[0])
+	// @ invariant i == 2 ==> offset == oldOffset + 12 * (int(base.PathMeta.SegLen[0]) + int(base.PathMeta.SegLen[1]))
+	// @ invariant i == 3 ==> offset == oldOffset + 12 * (int(base.PathMeta.SegLen[0]) + int(base.PathMeta.SegLen[1]) + int(base.PathMeta.SegLen[2]))
 	// @ invariant sl.Bytes(buf, 0, len(buf))
 	// @ decreases base.NumINF - i
 	for i := 0; i < base.NumINF; i++ {
+		// @ oldOffsetInner := offset
 		// @ invariant base.WeaklyValid()
 		// @ invariant i < base.NumINF
 		// @ invariant 0 <= j && j <= int(base.PathMeta.SegLen[i])
-		// @ invariant offset == old(offset) + 12 * j
+		// @ invariant offset == oldOffsetInner + 12 * j
+		// @ invariant 4 <= offset && offset <= oldOffset + 12 * scion.MaxHops
 		// @ invariant sl.Bytes(buf, 0, len(buf))
 		// @ decreases int(base.PathMeta.SegLen[i]) - j
 		for j := 0; j < int(base.PathMeta.SegLen[i]); j++ {
@@ -307,7 +311,6 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 			offset += 12
 		}
 	}
-	// @ fold sl.Bytes(buf, 0, len(buf))
 }
 
 // @ requires len(b) >= 6
