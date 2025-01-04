@@ -124,7 +124,7 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 // @ requires  acc(pld, _)
 // @ requires  len(buf) >= MACBufferSize
 // @ preserves sl.Bytes(buf, 0, len(buf))
-// @ preserves acc(sl.Bytes(ubuf, 0, len(ubuf)), R1)
+// @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves acc(s, R0)
 // @ preserves acc(s.Mem(ubuf), R0)
 // @ preserves acc(s.Path.Mem(ubuf), R49)
@@ -236,8 +236,10 @@ func serializeAuthenticatedData(
 	// @ fold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R10)
 
 	// @ sl.SplitRange_Bytes(buf, offset, len(buf), writePerm)
+	// @ sl.SplitRange_Bytes(ubuf, int(slayers.CmnHdrLen+s.AddrHdrLenSpecInternal()), int(s.HdrLen*slayers.LineLen), writePerm)
 	err := zeroOutMutablePath(s.Path, buf[offset:] /*@, ubuf[slayers.CmnHdrLen+s.AddrHdrLenSpecInternal() : s.HdrLen*slayers.LineLen] @*/)
 	// @ sl.CombineRange_Bytes(buf, offset, len(buf), writePerm)
+	// @ sl.CombineRange_Bytes(ubuf, int(slayers.CmnHdrLen+s.AddrHdrLenSpecInternal()), int(s.HdrLen*slayers.LineLen), writePerm)
 	if err != nil {
 		return 0, err
 	}
@@ -249,6 +251,7 @@ func serializeAuthenticatedData(
 // @ requires  len(buf) >=  28 + 12 * scion.MaxHops + epic.MetadataLen
 // @ preserves acc(orig.Mem(ubuf), R1)
 // @ preserves sl.Bytes(buf, 0, len(buf))
+// @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (retErr error) {
