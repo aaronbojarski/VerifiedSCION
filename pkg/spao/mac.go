@@ -33,6 +33,7 @@ import (
 	"github.com/scionproto/scion/pkg/slayers/path/scion"
 	// @ . "github.com/scionproto/scion/verification/utils/definitions"
 	// @ sl "github.com/scionproto/scion/verification/utils/slices"
+	// @ "github.com/scionproto/scion/pkg/addr"
 )
 
 const (
@@ -123,8 +124,9 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 // @ requires  acc(pld, _)
 // @ requires  len(buf) >= MACBufferSize
 // @ preserves sl.Bytes(buf, 0, len(buf))
-// @ preserves acc(s, R49)
-// @ preserves acc(s.Mem(ubuf), R49)
+// @ preserves acc(sl.Bytes(ubuf, 0, len(ubuf)), R1)
+// @ preserves acc(s, R0)
+// @ preserves acc(s.Mem(ubuf), R0)
 // @ preserves acc(s.Path.Mem(ubuf), R49)
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
@@ -136,64 +138,105 @@ func serializeAuthenticatedData(
 	pld []byte,
 	/*@ ghost ubuf []byte, @*/
 ) (n int, retErr error) {
-
+	// @ preserves len(buf) >= MACBufferSize && sl.Bytes(buf, 0, len(buf))
+	// @ decreases
+	// @ outline (
 	// @ unfold sl.Bytes(buf, 0, len(buf))
 	_ = buf[MACBufferSize-1]
+	// @ fold sl.Bytes(buf, 0, len(buf))
+	// @ )
 	// @ unfold acc(s.Mem(ubuf), R50)
-	// @ defer fold acc(s.Mem(ubuf), R50)
 	hdrLen := slayers.CmnHdrLen + s.AddrHdrLen( /*@ ubuf, false @*/ ) + s.Path.Len( /*@ ubuf @*/ )
+	// @ fold acc(s.Mem(ubuf), R50)
 	if hdrLen > slayers.MaxHdrLen {
-		// @ fold sl.Bytes(buf, 0, len(buf))
 		return 0, serrors.New("SCION header length exceeds maximum",
 			"max", slayers.MaxHdrLen, "actual", hdrLen)
 	}
 	if hdrLen%slayers.LineLen != 0 {
-		// @ fold sl.Bytes(buf, 0, len(buf))
 		return 0, serrors.New("SCION header length is not an integer multiple of line length",
 			"actual", hdrLen)
 	}
 
+	// @ preserves len(buf) >= MACBufferSize && sl.Bytes(buf, 0, len(buf))
+	// @ preserves acc(s.Mem(ubuf), R50)
+	// @ ensures   fixAuthDataInputLen <= offset && offset <= fixAuthDataInputLen + 16
+	// @ decreases
+	// @ outline (
+	// @ unfold sl.Bytes(buf, 0, len(buf))
 	buf[0] = byte(hdrLen / slayers.LineLen)
 	buf[1] = byte(pldType)
-	// @ assert forall j int :: { &buf[2:][j] } 0 <= 2 ==> &buf[2:][j] == &buf[2 + j]
+	// @ assert &buf[2:][0] == &buf[2 + 0] && &buf[2:][1] == &buf[2 + 1]
 	binary.BigEndian.PutUint16(buf[2:], uint16(len(pld)))
 	buf[4] = byte(opt.Algorithm())
 	buf[5] = byte(0)
-	//@ assert forall j int :: { &buf[6:12][j] } 0 <= 6 ==> &buf[6:12][j] == &buf[6 + j]
+	// @ assert &buf[6:12][0] == &buf[6 + 0] && &buf[6:12][1] == &buf[6 + 1]
+	// @ assert &buf[6:12][2] == &buf[6 + 2] && &buf[6:12][3] == &buf[6 + 3]
+	// @ assert &buf[6:12][4] == &buf[6 + 4] && &buf[6:12][5] == &buf[6 + 5]
 	bigEndianPutUint48(buf[6:12], opt.TimestampSN())
+	// @ unfold acc(s.Mem(ubuf), R50)
 	firstHdrLine := uint32(s.Version&0xF)<<28 | uint32(s.TrafficClass&0x3f)<<20 | s.FlowID&0xFFFFF
-	// @ assert forall j int :: { &buf[12:][j] } 0 <= 4 ==> &buf[12:][j] == &buf[12 + j]
+	// @ assert &buf[12:][0] == &buf[12 + 0] && &buf[12:][1] == &buf[12 + 1]
+	// @ assert &buf[12:][2] == &buf[12 + 2] && &buf[12:][3] == &buf[12 + 3]
 	binary.BigEndian.PutUint32(buf[12:], firstHdrLine)
 	buf[16] = byte(s.PathType)
 	buf[17] = byte(s.DstAddrType&0xF)<<4 | byte(s.SrcAddrType&0xF)
-	// @ assert forall j int :: { &buf[18:][j] } 0 <= 2 ==> &buf[18:][j] == &buf[18 + j]
+	// @ assert &buf[18:][0] == &buf[18 + 0] && &buf[18:][1] == &buf[18 + 1]
 	binary.BigEndian.PutUint16(buf[18:], 0)
+
 	offset := fixAuthDataInputLen
 
 	if !opt.SPI().IsDRKey() {
+		// @ unfold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R50)
 		// @ assert forall j int :: { &buf[offset:][j] } 0 <= 8 ==> &buf[offset:][j] == &buf[offset + j]
 		binary.BigEndian.PutUint64(buf[offset:], uint64(s.DstIA))
 		// @ assert forall j int :: { &buf[offset+8:][j] } 0 <= 8 ==> &buf[offset+8:][j] == &buf[offset+8 + j]
 		binary.BigEndian.PutUint64(buf[offset+8:], uint64(s.SrcIA))
+		// @ fold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R50)
 		offset += 16
 	}
+	// @ fold acc(s.Mem(ubuf), R50)
 	// @ fold sl.Bytes(buf, 0, len(buf))
+	// @ )
+
+	// @ unfold acc(s.Mem(ubuf), R1)
+	// @ defer fold acc(s.Mem(ubuf), R1)
+	// @ unfold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R10)
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
 			opt.SPI().Direction() == slayers.PacketAuthReceiverSide) {
-		// @ sl.SplitRange_Bytes(buf, offset, len(buf), writePerm)
-		offset += copy(buf[offset:], s.RawDstAddr /*@ , R20 @*/)
-		// @ sl.CombineRange_Bytes(buf, offset, len(buf), writePerm)
+		// @ dstAddrBytes := s.DstAddrType.Length()
+		// @ ubufOffset := slayers.CmnHdrLen + 2 * addr.IABytes
+		// @ copyOffset := offset
+		// @ sl.SplitRange_Bytes(buf, copyOffset, len(buf), writePerm)
+		// @ sl.SplitRange_Bytes(ubuf, ubufOffset, ubufOffset+dstAddrBytes, R10)
+		// @ unfold sl.Bytes(buf[copyOffset:], 0, len(buf[copyOffset:]))
+		// @ unfold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+dstAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+dstAddrBytes])), R10)
+		offset += copy(buf[offset:], s.RawDstAddr /*@ , R10 @*/)
+		// @ fold sl.Bytes(buf[copyOffset:], 0, len(buf[copyOffset:]))
+		// @ fold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+dstAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+dstAddrBytes])), R10)
+		// @ sl.CombineRange_Bytes(buf, copyOffset, len(buf), writePerm)
+		// @ sl.CombineRange_Bytes(ubuf, ubufOffset, ubufOffset+dstAddrBytes, R10)
 	}
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
 			opt.SPI().Direction() == slayers.PacketAuthSenderSide) {
-		// @ sl.SplitRange_Bytes(buf, offset, len(buf), writePerm)
-		offset += copy(buf[offset:], s.RawSrcAddr /*@ , R20 @*/)
-		// @ sl.CombineRange_Bytes(buf, offset, len(buf), writePerm)
+		// @ srcAddrBytes := s.SrcAddrType.Length()
+		// @ ubufOffset := slayers.CmnHdrLen + 2 * addr.IABytes + s.DstAddrType.Length()
+		// @ copyOffset := offset
+		// @ sl.SplitRange_Bytes(buf, copyOffset, len(buf), writePerm)
+		// @ sl.SplitRange_Bytes(ubuf, ubufOffset, ubufOffset+srcAddrBytes, R10)
+		// @ unfold sl.Bytes(buf[copyOffset:], 0, len(buf[copyOffset:]))
+		// @ unfold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+srcAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+srcAddrBytes])), R10)
+		offset += copy(buf[offset:], s.RawSrcAddr /*@ , R10 @*/)
+		// @ fold sl.Bytes(buf[copyOffset:], 0, len(buf[copyOffset:]))
+		// @ fold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+srcAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+srcAddrBytes])), R10)
+		// @ sl.CombineRange_Bytes(buf, copyOffset, len(buf), writePerm)
+		// @ sl.CombineRange_Bytes(ubuf, ubufOffset, ubufOffset+srcAddrBytes, R10)
 	}
+	// @ fold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R10)
+
 	// @ sl.SplitRange_Bytes(buf, offset, len(buf), writePerm)
-	err := zeroOutMutablePath(s.Path, buf[offset:] /*@, ubuf @*/)
+	err := zeroOutMutablePath(s.Path, buf[offset:] /*@, ubuf[slayers.CmnHdrLen+s.AddrHdrLenSpecInternal() : s.HdrLen*slayers.LineLen] @*/)
 	// @ sl.CombineRange_Bytes(buf, offset, len(buf), writePerm)
 	if err != nil {
 		return 0, err
@@ -204,8 +247,7 @@ func serializeAuthenticatedData(
 
 // @ requires  orig != nil
 // @ requires  len(buf) >=  28 + 12 * scion.MaxHops + epic.MetadataLen
-// @ preserves acc(orig.Mem(ubuf), R50)
-// @ preserves sl.Bytes(ubuf, 0, len(ubuf))
+// @ preserves acc(orig.Mem(ubuf), R1)
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
