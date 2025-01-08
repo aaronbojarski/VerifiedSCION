@@ -14,7 +14,7 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04 # the ubuntu version is fixed here, since the ci fails for ubuntu-24.04 (no libssl found).
     steps:
       - name: Checkout the current repository
         uses: actions/checkout@v3
