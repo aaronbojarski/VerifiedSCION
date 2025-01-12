@@ -73,9 +73,19 @@ type MACInput struct {
 // and returned as a slice of length 16.
 
 // @ requires  acc(sl.Bytes(input.Key, 0, len(input.Key)), R50)
+// @ requires  acc(input.ScionLayer.Mem(ubuf), R00)
+// @ requires  input.ScionLayer != nil
+// @ requires  input.ScionLayer.ValidPathMetaData(ubuf)
+// @ requires  acc(input.Pld)
+// @ requires  len(auxBuffer) >= MACBufferSize
+// @ requires  acc(outBuffer)
+// @ requires  acc(auxBuffer)
+// @ preserves acc(input.ScionLayer, R0)
+// @ preserves acc(input.ScionLayer.Path.Mem(ubuf), R49)
 // @ preserves sl.Bytes(auxBuffer, 0, len(auxBuffer))
 // @ preserves sl.Bytes(outBuffer, 0, len(outBuffer))
-// @ ensures   sl.Bytes(b, 0, len(b))
+// @ preserves sl.Bytes(ubuf, 0, len(ubuf))
+// @ ensures   acc(b)
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func ComputeAuthCMAC(
@@ -100,12 +110,15 @@ func ComputeAuthCMAC(
 	if err != nil {
 		return nil, err
 	}
+	// @ sl.SplitRange_Bytes(auxBuffer, 0, inputLen, R1)
 	cmac.Write(auxBuffer[:inputLen])
+	// @ sl.CombineRange_Bytes(auxBuffer, 0, inputLen, R1)
 	cmac.Write(input.Pld)
 	return cmac.Sum(outBuffer[:0]), nil
 }
 
 // @ requires  acc(sl.Bytes(key, 0, len(key)), R50)
+// @ ensures   retErr == nil ==> m.Mem() && typeOf(m) == type[*cmac.cmac]
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func initCMAC(key []byte) (m hash.Hash, retErr error) {
@@ -121,13 +134,15 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 }
 
 // @ requires  s != nil
-// @ requires  acc(pld, _)
+// @ requires  acc(pld, R50)
 // @ requires  len(buf) >= MACBufferSize
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves acc(s, R0)
-// @ preserves acc(s.Mem(ubuf), R0)
+// @ preserves acc(s.Mem(ubuf), R00)
+// @ preserves s.ValidPathMetaData(ubuf)
 // @ preserves acc(s.Path.Mem(ubuf), R49)
+// @ ensures   0 <= n && n <= MACBufferSize
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func serializeAuthenticatedData(
@@ -198,8 +213,8 @@ func serializeAuthenticatedData(
 	// @ fold sl.Bytes(buf, 0, len(buf))
 	// @ )
 
-	// @ unfold acc(s.Mem(ubuf), R1)
-	// @ defer fold acc(s.Mem(ubuf), R1)
+	// @ unfold acc(s.Mem(ubuf), R0)
+	// @ defer fold acc(s.Mem(ubuf), R0)
 	// @ unfold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R10)
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
@@ -249,9 +264,16 @@ func serializeAuthenticatedData(
 
 // @ requires  orig != nil
 // @ requires  len(buf) >=  28 + 12 * scion.MaxHops + epic.MetadataLen
-// @ preserves acc(orig.Mem(ubuf), R1)
+// @ requires  acc(orig.Mem(ubuf), R0)
+// @ requires  (typeOf(orig) == type[*scion.Raw] ==>
+// @				orig.(*scion.Raw).GetBase(ubuf).WeaklyValid()) &&
+// @		   (typeOf(orig) == type[*scion.Decoded] ==>
+// @				orig.(*scion.Decoded).GetBase(ubuf).WeaklyValid()) &&
+// @		   (typeOf(orig) == type[*epic.Path] ==>
+// @				orig.(*epic.Path).GetBase(ubuf).WeaklyValid())
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
+// @ ensures   acc(orig.Mem(ubuf), R0)
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (retErr error) {
@@ -305,7 +327,7 @@ func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (
 }
 
 // @ requires  len(buf) >= 28 + 12 * scion.MaxHops
-// @ requires  base.WeaklyValid()
+// @ preserves base.WeaklyValid()
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ decreases
 func zeroOutWithBase(base scion.Base, buf []byte) {
@@ -358,7 +380,7 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 	}
 }
 
-// @ requires len(b) >= 6
+// @ requires  len(b) >= 6
 // @ preserves acc(&b[0]) && acc(&b[1]) && acc(&b[2]) && acc(&b[3]) && acc(&b[4]) && acc(&b[5])
 // @ decreases
 func bigEndianPutUint48(b []byte, v uint64) {

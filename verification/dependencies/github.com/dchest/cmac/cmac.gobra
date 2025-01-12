@@ -12,9 +12,28 @@ package cmac
 import (
 	"crypto/cipher"
 	"hash"
+
+	def "github.com/scionproto/scion/verification/utils/definitions"
+	sl "github.com/scionproto/scion/verification/utils/slices"
 )
 
+type cmac struct {
+	privateField def.PrivateField
+}
 
+pred (c *cmac) Mem() {
+	acc(c)
+}
+
+ensures typeOf(h) == type[*cmac]
+ensures err == nil ==> h.Mem()
 ensures err != nil ==> err.ErrorMem()
 decreases
 func New(c cipher.Block) (h hash.Hash, err error)
+
+ensures err != nil ==> err.ErrorMem()
+decreases
+func (d *cmac) Write(p []byte) (nn int, err error)
+
+decreases
+func (d *cmac) Sum(b []byte) []byte 
