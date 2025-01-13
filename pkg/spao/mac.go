@@ -77,8 +77,8 @@ type MACInput struct {
 // @ preserves acc(input.Pld)
 // @ preserves acc(sl.Bytes(input.Key, 0, len(input.Key)), R50)
 // @ preserves input.ScionLayer != nil
-// @ preserves acc(input.ScionLayer, R0)
-// @ preserves acc(input.ScionLayer.Mem(ubuf), R00)
+// @ preserves acc(input.ScionLayer, R9)
+// @ preserves acc(input.ScionLayer.Mem(ubuf), R8)
 // @ preserves acc(input.ScionLayer.Path.Mem(ubuf), R49)
 // @ preserves input.ScionLayer.ValidPathMetaData(ubuf)
 // @ preserves sl.Bytes(auxBuffer, 0, len(auxBuffer))
@@ -137,8 +137,8 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves s != nil
-// @ preserves acc(s, R0)
-// @ preserves acc(s.Mem(ubuf), R00)
+// @ preserves acc(s, R9)
+// @ preserves acc(s.Mem(ubuf), R8)
 // @ preserves acc(s.Path.Mem(ubuf), R49)
 // @ preserves s.ValidPathMetaData(ubuf)
 // @ ensures   0 <= n && n <= MACBufferSize
@@ -212,8 +212,8 @@ func serializeAuthenticatedData(
 	// @ fold sl.Bytes(buf, 0, len(buf))
 	// @ )
 
-	// @ unfold acc(s.Mem(ubuf), R0)
-	// @ defer fold acc(s.Mem(ubuf), R0)
+	// @ unfold acc(s.Mem(ubuf), R9)
+	// @ defer fold acc(s.Mem(ubuf), R9)
 	// @ unfold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R10)
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
@@ -263,7 +263,7 @@ func serializeAuthenticatedData(
 
 // @ requires  orig != nil
 // @ requires  len(buf) >=  28 + 12 * scion.MaxHops + epic.MetadataLen
-// @ requires  acc(orig.Mem(ubuf), R0)
+// @ requires  acc(orig.Mem(ubuf), R9)
 // @ requires  (typeOf(orig) == type[*scion.Raw] ==>
 // @				orig.(*scion.Raw).GetBase(ubuf).WeaklyValid()) &&
 // @		   (typeOf(orig) == type[*scion.Decoded] ==>
@@ -272,7 +272,7 @@ func serializeAuthenticatedData(
 // @				orig.(*epic.Path).GetBase(ubuf).WeaklyValid())
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
-// @ ensures   acc(orig.Mem(ubuf), R0)
+// @ ensures   acc(orig.Mem(ubuf), R9)
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (retErr error) {
