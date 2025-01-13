@@ -72,16 +72,15 @@ type MACInput struct {
 // The resulting MAC is written to outBuffer (appending, if necessary),
 // and returned as a slice of length 16.
 
-// @ requires  acc(sl.Bytes(input.Key, 0, len(input.Key)), R50)
-// @ requires  acc(input.ScionLayer.Mem(ubuf), R00)
-// @ requires  input.ScionLayer != nil
-// @ requires  input.ScionLayer.ValidPathMetaData(ubuf)
-// @ requires  acc(input.Pld)
-// @ requires  len(auxBuffer) >= MACBufferSize
+// @ requires  acc(auxBuffer) && len(auxBuffer) >= MACBufferSize
 // @ requires  acc(outBuffer)
-// @ requires  acc(auxBuffer)
+// @ preserves acc(input.Pld)
+// @ preserves acc(sl.Bytes(input.Key, 0, len(input.Key)), R50)
+// @ preserves input.ScionLayer != nil
 // @ preserves acc(input.ScionLayer, R0)
+// @ preserves acc(input.ScionLayer.Mem(ubuf), R00)
 // @ preserves acc(input.ScionLayer.Path.Mem(ubuf), R49)
+// @ preserves input.ScionLayer.ValidPathMetaData(ubuf)
 // @ preserves sl.Bytes(auxBuffer, 0, len(auxBuffer))
 // @ preserves sl.Bytes(outBuffer, 0, len(outBuffer))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
@@ -117,7 +116,7 @@ func ComputeAuthCMAC(
 	return cmac.Sum(outBuffer[:0]), nil
 }
 
-// @ requires  acc(sl.Bytes(key, 0, len(key)), R50)
+// @ preserves acc(sl.Bytes(key, 0, len(key)), R50)
 // @ ensures   retErr == nil ==> m.Mem() && typeOf(m) == type[*cmac.cmac]
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
@@ -133,15 +132,15 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 	return mac, nil
 }
 
-// @ requires  s != nil
-// @ requires  acc(pld, R50)
 // @ requires  len(buf) >= MACBufferSize
+// @ preserves acc(pld, R50)
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
+// @ preserves s != nil
 // @ preserves acc(s, R0)
 // @ preserves acc(s.Mem(ubuf), R00)
-// @ preserves s.ValidPathMetaData(ubuf)
 // @ preserves acc(s.Path.Mem(ubuf), R49)
+// @ preserves s.ValidPathMetaData(ubuf)
 // @ ensures   0 <= n && n <= MACBufferSize
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
