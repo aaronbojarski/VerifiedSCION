@@ -209,9 +209,10 @@ func (o PacketAuthOption) Reset(
 }
 
 // SPI returns the value set in the Security Parameter Index in the extension.
-// @ requires  acc(o.EndToEndOption, R50)
-// @ requires  len(o.OptData) >= 5
-// @ requires  acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+// @ preserves acc(o.EndToEndOption, R49)
+// @ preserves len(o.OptData) >= 4
+// @ preserves acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+// @ ensures   len(o.OptData) == old(len(o.OptData))
 // @ decreases
 func (o PacketAuthOption) SPI() PacketAuthSPI {
 	// @ unfold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
@@ -222,9 +223,10 @@ func (o PacketAuthOption) SPI() PacketAuthSPI {
 }
 
 // Algorithm returns the algorithm type stored in the data buffer.
-// @ requires  acc(o.EndToEndOption, R50)
-// @ requires  len(o.OptData) >= 5
-// @ requires  acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+// @ preserves acc(o.EndToEndOption, R49)
+// @ preserves len(o.OptData) >= 5
+// @ preserves acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+// @ ensures   len(o.OptData) == old(len(o.OptData))
 // @ decreases
 func (o PacketAuthOption) Algorithm() PacketAuthAlg {
 	// @ unfold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
@@ -233,9 +235,10 @@ func (o PacketAuthOption) Algorithm() PacketAuthAlg {
 }
 
 // Timestamp returns the value set in the homonym field in the extension.
-// @ requires  acc(o.EndToEndOption, R50)
-// @ requires  len(o.OptData) >= 12
-// @ requires  acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+// @ preserves acc(o.EndToEndOption, R49)
+// @ preserves len(o.OptData) >= 12
+// @ preserves acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+// @ ensures   len(o.OptData) == old(len(o.OptData))
 // @ decreases
 func (o PacketAuthOption) TimestampSN() uint64 {
 	// @ unfold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)

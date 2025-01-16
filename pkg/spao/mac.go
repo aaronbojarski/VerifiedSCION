@@ -72,8 +72,8 @@ type MACInput struct {
 // The resulting MAC is written to outBuffer (appending, if necessary),
 // and returned as a slice of length 16.
 
-// @ requires  acc(auxBuffer) && len(auxBuffer) >= MACBufferSize
-// @ requires  acc(outBuffer)
+// @ requires  len(auxBuffer) >= MACBufferSize
+// @ requires  len(outBuffer) >= aes.BlockSize
 // @ preserves acc(input.Pld)
 // @ preserves acc(sl.Bytes(input.Key, 0, len(input.Key)), R50)
 // @ preserves input.ScionLayer != nil
@@ -81,10 +81,12 @@ type MACInput struct {
 // @ preserves acc(input.ScionLayer.Mem(ubuf), R8)
 // @ preserves acc(input.ScionLayer.Path.Mem(ubuf), R49)
 // @ preserves input.ScionLayer.ValidPathMetaData(ubuf)
+// @ preserves acc(input.Header.EndToEndOption, R48)
+// @ preserves len(input.Header.OptData) >= 12
+// @ preserves acc(sl.Bytes(input.Header.OptData, 0, len(input.Header.OptData)), R49)
 // @ preserves sl.Bytes(auxBuffer, 0, len(auxBuffer))
 // @ preserves sl.Bytes(outBuffer, 0, len(outBuffer))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
-// @ ensures   acc(b)
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func ComputeAuthCMAC(
@@ -141,6 +143,9 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 // @ preserves acc(s.Mem(ubuf), R8)
 // @ preserves acc(s.Path.Mem(ubuf), R49)
 // @ preserves s.ValidPathMetaData(ubuf)
+// @ preserves acc(opt.EndToEndOption, R48)
+// @ preserves len(opt.OptData) >= 12
+// @ preserves acc(sl.Bytes(opt.OptData, 0, len(opt.OptData)), R49)
 // @ ensures   0 <= n && n <= MACBufferSize
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
@@ -173,6 +178,9 @@ func serializeAuthenticatedData(
 
 	// @ preserves len(buf) >= MACBufferSize && sl.Bytes(buf, 0, len(buf))
 	// @ preserves acc(s.Mem(ubuf), R50)
+	// @ preserves acc(opt.EndToEndOption, R49)
+	// @ preserves len(opt.OptData) >= 12
+	// @ preserves acc(sl.Bytes(opt.OptData, 0, len(opt.OptData)), R50)
 	// @ ensures   fixAuthDataInputLen <= offset && offset <= fixAuthDataInputLen + 16
 	// @ decreases
 	// @ outline (
