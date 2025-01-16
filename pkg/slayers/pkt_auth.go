@@ -43,6 +43,7 @@ import (
 
 	"github.com/scionproto/scion/pkg/private/serrors"
 	// @ . "github.com/scionproto/scion/verification/utils/definitions"
+	//@ sl "github.com/scionproto/scion/verification/utils/slices"
 )
 
 const (
@@ -208,23 +209,40 @@ func (o PacketAuthOption) Reset(
 }
 
 // SPI returns the value set in the Security Parameter Index in the extension.
-// @ requires  acc(o.EndToEndOption.Mem(0), R50)
+// @ requires  acc(o.EndToEndOption, R50)
+// @ requires  len(o.OptData) >= 5
+// @ requires  acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
 // @ decreases
 func (o PacketAuthOption) SPI() PacketAuthSPI {
+	// @ unfold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+	// @ defer fold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+	// @ assert &o.OptData[:4][0] == &o.OptData[0] && &o.OptData[:4][1] == &o.OptData[1]
+	// @ assert &o.OptData[:4][2] == &o.OptData[2] && &o.OptData[:4][3] == &o.OptData[3]
 	return PacketAuthSPI(binary.BigEndian.Uint32(o.OptData[:4]))
 }
 
 // Algorithm returns the algorithm type stored in the data buffer.
-// @ requires  acc(o.EndToEndOption.Mem(0), R50)
+// @ requires  acc(o.EndToEndOption, R50)
+// @ requires  len(o.OptData) >= 5
+// @ requires  acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
 // @ decreases
 func (o PacketAuthOption) Algorithm() PacketAuthAlg {
+	// @ unfold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+	// @ defer fold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
 	return PacketAuthAlg(o.OptData[4])
 }
 
 // Timestamp returns the value set in the homonym field in the extension.
-// @ requires  acc(o.EndToEndOption.Mem(0), R50)
+// @ requires  acc(o.EndToEndOption, R50)
+// @ requires  len(o.OptData) >= 12
+// @ requires  acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
 // @ decreases
 func (o PacketAuthOption) TimestampSN() uint64 {
+	// @ unfold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+	// @ defer fold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+	// @ assert &o.OptData[6:12][0] == &o.OptData[6 + 0] && &o.OptData[6:12][1] == &o.OptData[6 + 1]
+	// @ assert &o.OptData[6:12][2] == &o.OptData[6 + 2] && &o.OptData[6:12][3] == &o.OptData[6 + 3]
+	// @ assert &o.OptData[6:12][4] == &o.OptData[6 + 4] && &o.OptData[6:12][5] == &o.OptData[6 + 5]
 	return bigEndianUint48(o.OptData[6:12])
 }
 
@@ -238,7 +256,7 @@ func (o PacketAuthOption) Authenticator() []byte {
 }
 
 // @ requires  len(b) >= 6
-// @ requires  acc(&b[0], R50) && acc(&b[1], R50) && acc(&b[2], R50) && acc(&b[3], R50) && acc(&b[4], R50) && acc(&b[5], R50)
+// @ preserves acc(&b[0], R50) && acc(&b[1], R50) && acc(&b[2], R50) && acc(&b[3], R50) && acc(&b[4], R50) && acc(&b[5], R50)
 // @ decreases
 func bigEndianUint48(b []byte) (res uint64) {
 	// @ assert &b[2:6][0] == &b[2 + 0] && &b[2:6][1] == &b[2 + 1]
