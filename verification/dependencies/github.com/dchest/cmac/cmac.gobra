@@ -25,15 +25,24 @@ pred (c *cmac) Mem() {
 	acc(c)
 }
 
-ensures typeOf(h) == type[*cmac]
-ensures err == nil ==> h.Mem()
-ensures err != nil ==> err.ErrorMem()
+decreases
+pure func (d *cmac) BlockSizeSpec() int
+
+preserves c != nil && c.Mem()
+ensures   typeOf(h) == type[*cmac]
+ensures   err == nil ==> h.Mem()
+ensures   err == nil ==> h.BlockSizeSpec() == c.BlockSize()
+ensures   err != nil ==> err.ErrorMem()
 decreases
 func New(c cipher.Block) (h hash.Hash, err error)
 
-ensures err != nil ==> err.ErrorMem()
+preserves d.Mem() 
+preserves acc(p, 1/1000)
+ensures   err != nil ==> err.ErrorMem()
 decreases
-func (d *cmac) Write(p []byte) (nn int, err error)
+func (d *cmac) Write(p []byte) (n int, err error)
 
+requires  sl.Bytes(b, 0, len(b))
+ensures   cap(b) >= d.BlockSizeSpec() ==> sl.Bytes(b, 0, d.BlockSizeSpec())
 decreases
 func (d *cmac) Sum(b []byte) []byte 

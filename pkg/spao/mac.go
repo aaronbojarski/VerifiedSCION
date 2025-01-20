@@ -74,7 +74,6 @@ type MACInput struct {
 
 // @ requires  len(auxBuffer) >= MACBufferSize
 // @ requires  len(outBuffer) >= aes.BlockSize
-// @ preserves acc(input.Pld)
 // @ preserves acc(sl.Bytes(input.Key, 0, len(input.Key)), R50)
 // @ preserves input.ScionLayer != nil
 // @ preserves acc(input.ScionLayer, R9)
@@ -84,6 +83,7 @@ type MACInput struct {
 // @ preserves acc(input.Header.EndToEndOption, R48)
 // @ preserves len(input.Header.OptData) >= 12
 // @ preserves acc(sl.Bytes(input.Header.OptData, 0, len(input.Header.OptData)), R49)
+// @ preserves acc(sl.Bytes(input.Pld, 0, len(input.Pld)), R6)
 // @ preserves sl.Bytes(auxBuffer, 0, len(auxBuffer))
 // @ preserves sl.Bytes(outBuffer, 0, len(outBuffer))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
@@ -112,9 +112,14 @@ func ComputeAuthCMAC(
 		return nil, err
 	}
 	// @ sl.SplitRange_Bytes(auxBuffer, 0, inputLen, R1)
+	// @ unfold acc(sl.Bytes(auxBuffer[:inputLen], 0, inputLen), R1)
 	cmac.Write(auxBuffer[:inputLen])
+	// @ fold acc(sl.Bytes(auxBuffer[:inputLen], 0, inputLen), R1)
 	// @ sl.CombineRange_Bytes(auxBuffer, 0, inputLen, R1)
+
+	// @ unfold acc(sl.Bytes(input.Pld, 0, len(input.Pld)), R7)
 	cmac.Write(input.Pld)
+	// @ fold acc(sl.Bytes(input.Pld, 0, len(input.Pld)), R7)
 	return cmac.Sum(outBuffer[:0]), nil
 }
 
@@ -135,7 +140,6 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 }
 
 // @ requires  len(buf) >= MACBufferSize
-// @ preserves acc(pld, R50)
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves s != nil
@@ -146,6 +150,7 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 // @ preserves acc(opt.EndToEndOption, R48)
 // @ preserves len(opt.OptData) >= 12
 // @ preserves acc(sl.Bytes(opt.OptData, 0, len(opt.OptData)), R49)
+// @ preserves acc(sl.Bytes(pld, 0, len(pld)), R50)
 // @ ensures   0 <= n && n <= MACBufferSize
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
