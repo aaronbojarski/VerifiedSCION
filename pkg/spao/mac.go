@@ -214,9 +214,9 @@ func serializeAuthenticatedData(
 
 	if !opt.SPI().IsDRKey() {
 		// @ unfold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R50)
-		// @ assert forall j int :: { &buf[offset:][j] } 0 <= 8 ==> &buf[offset:][j] == &buf[offset + j]
+		// @ sl.AssertSliceOverlap(buf, offset, offset+8)
 		binary.BigEndian.PutUint64(buf[offset:], uint64(s.DstIA))
-		// @ assert forall j int :: { &buf[offset+8:][j] } 0 <= 8 ==> &buf[offset+8:][j] == &buf[offset+8 + j]
+		// @ sl.AssertSliceOverlap(buf, offset+8, offset+16)
 		binary.BigEndian.PutUint64(buf[offset+8:], uint64(s.SrcIA))
 		// @ fold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R50)
 		offset += 16
@@ -324,12 +324,12 @@ func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (
 	case *onehop.Path:
 		// Zero out IF.SegID
 		// @ unfold sl.Bytes(buf, 0, len(buf))
-		// @ assert forall j int :: { &buf[2:][j] } 0 <= 2 ==> &buf[2:][j] == &buf[2 + j]
+		// @ sl.AssertSliceOverlap(buf, 2, 4)
 		binary.BigEndian.PutUint16(buf[2:], 0)
 		// Zero out HF.Flags&&Alerts
 		buf[8] = 0
 		// Zero out second HF
-		// @ assert forall j int :: { &buf[20:][j] } 0 <= 12 ==> &buf[20:][j] == &buf[20 + j]
+		// @ sl.AssertSliceOverlap(buf, 20, 32)
 		copy(buf[20:], []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} /*@ , R20 @*/)
 		// @ fold sl.Bytes(buf, 0, len(buf))
 		return nil
@@ -339,7 +339,7 @@ func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (
 }
 
 // @ requires  len(buf) >= 28 + 12 * scion.MaxHops
-// @ preserves base.WeaklyValid()
+// @ requires  base.WeaklyValid()
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ decreases
 func zeroOutWithBase(base scion.Base, buf []byte) {
@@ -358,8 +358,7 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 	for i := 0; i < base.NumINF; i++ {
 		// Zero out IF.SegID
 		// @ unfold sl.Bytes(buf, 0, len(buf))
-		// @ assert forall j int :: { &buf[offset+2:][j] } 0 <= j && j < len(buf[offset+2:]) ==>
-		// @ 	&buf[offset+2:][j] == &buf[offset+2+j]
+		// @ sl.AssertSliceOverlap(buf, offset+2, len(buf))
 		binary.BigEndian.PutUint16(buf[offset+2:], 0)
 		// @ fold sl.Bytes(buf, 0, len(buf))
 		offset += 8
@@ -398,6 +397,7 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 func bigEndianPutUint48(b []byte, v uint64) {
 	b[0] = byte(v >> 40)
 	b[1] = byte(v >> 32)
-	//@ assert forall j int :: { &b[2:6][j] } 0 <= 4 ==> &b[2:6][j] == &b[2 + j]
+	// @ assert &b[2:6][0] == &b[2 + 0] && &b[2:6][1] == &b[2 + 1]
+	// @ assert &b[2:6][2] == &b[2 + 2] && &b[2:6][3] == &b[2 + 3]
 	binary.BigEndian.PutUint32(b[2:6], uint32(v))
 }
