@@ -140,7 +140,6 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 // @ requires  len(buf) >= MACBufferSize
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
-// @ preserves s != nil
 // @ preserves acc(s.Mem(ubuf), R8)
 // @ preserves s.ValidPathMetaData(ubuf)
 // @ preserves acc(opt.EndToEndOption, R48)
