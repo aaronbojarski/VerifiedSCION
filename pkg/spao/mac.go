@@ -214,9 +214,9 @@ func serializeAuthenticatedData(
 
 	if !opt.SPI().IsDRKey() {
 		// @ unfold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R50)
-		// @ sl.AssertSliceOverlap(buf, offset, offset+8)
+		// @ sl.AssertSliceOverlap(buf, offset, len(buf))
 		binary.BigEndian.PutUint64(buf[offset:], uint64(s.DstIA))
-		// @ sl.AssertSliceOverlap(buf, offset+8, offset+16)
+		// @ sl.AssertSliceOverlap(buf, offset+8, len(buf))
 		binary.BigEndian.PutUint64(buf[offset+8:], uint64(s.SrcIA))
 		// @ fold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R50)
 		offset += 16
@@ -324,12 +324,12 @@ func zeroOutMutablePath(orig path.Path, buf []byte /*@, ghost ubuf []byte @*/) (
 	case *onehop.Path:
 		// Zero out IF.SegID
 		// @ unfold sl.Bytes(buf, 0, len(buf))
-		// @ sl.AssertSliceOverlap(buf, 2, 4)
+		// @ sl.AssertSliceOverlap(buf, 2, len(buf))
 		binary.BigEndian.PutUint16(buf[2:], 0)
 		// Zero out HF.Flags&&Alerts
 		buf[8] = 0
 		// Zero out second HF
-		// @ sl.AssertSliceOverlap(buf, 20, 32)
+		// @ sl.AssertSliceOverlap(buf, 20, len(buf))
 		copy(buf[20:], []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0} /*@ , R20 @*/)
 		// @ fold sl.Bytes(buf, 0, len(buf))
 		return nil
