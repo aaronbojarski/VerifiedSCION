@@ -74,12 +74,9 @@ type MACInput struct {
 
 // @ requires  len(auxBuffer) >= MACBufferSize
 // @ requires  len(outBuffer) >= aes.BlockSize
+// @ requires  acc(input.ScionLayer.Mem(ubuf), R8)
+// @ requires  input.Valid(ubuf)
 // @ preserves acc(sl.Bytes(input.Key, 0, len(input.Key)), R50)
-// @ preserves input.ScionLayer != nil
-// @ preserves acc(input.ScionLayer, R9)
-// @ preserves acc(input.ScionLayer.Mem(ubuf), R8)
-// @ preserves acc(input.ScionLayer.Path.Mem(ubuf), R49)
-// @ preserves input.ScionLayer.ValidPathMetaData(ubuf)
 // @ preserves acc(input.Header.EndToEndOption, R48)
 // @ preserves len(input.Header.OptData) >= 12
 // @ preserves acc(sl.Bytes(input.Header.OptData, 0, len(input.Header.OptData)), R49)
@@ -87,6 +84,7 @@ type MACInput struct {
 // @ preserves sl.Bytes(auxBuffer, 0, len(auxBuffer))
 // @ preserves sl.Bytes(outBuffer, 0, len(outBuffer))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
+// @ ensures   acc(input.ScionLayer.Mem(ubuf), R8)
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func ComputeAuthCMAC(
@@ -143,9 +141,7 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves s != nil
-// @ preserves acc(s, R9)
 // @ preserves acc(s.Mem(ubuf), R8)
-// @ preserves acc(s.Path.Mem(ubuf), R49)
 // @ preserves s.ValidPathMetaData(ubuf)
 // @ preserves acc(opt.EndToEndOption, R48)
 // @ preserves len(opt.OptData) >= 12
@@ -170,7 +166,7 @@ func serializeAuthenticatedData(
 	// @ fold sl.Bytes(buf, 0, len(buf))
 	// @ )
 	// @ unfold acc(s.Mem(ubuf), R50)
-	hdrLen := slayers.CmnHdrLen + s.AddrHdrLen( /*@ ubuf, false @*/ ) + s.Path.Len( /*@ ubuf @*/ )
+	hdrLen := slayers.CmnHdrLen + s.AddrHdrLen( /*@ ubuf, false @*/ ) + s.Path.Len( /*@ s.UBPath(ubuf) @*/ )
 	// @ fold acc(s.Mem(ubuf), R50)
 	if hdrLen > slayers.MaxHdrLen {
 		return 0, serrors.New("SCION header length exceeds maximum",
@@ -264,13 +260,13 @@ func serializeAuthenticatedData(
 
 	// @ sl.SplitRange_Bytes(buf, offset, len(buf), writePerm)
 	// @ sl.SplitRange_Bytes(ubuf, int(slayers.CmnHdrLen+s.AddrHdrLenSpecInternal()), int(s.HdrLen*slayers.LineLen), writePerm)
-	err := zeroOutMutablePath(s.Path, buf[offset:] /*@, ubuf[slayers.CmnHdrLen+s.AddrHdrLenSpecInternal() : s.HdrLen*slayers.LineLen] @*/)
+	err := zeroOutMutablePath(s.Path, buf[offset:] /*@, s.UBPath(ubuf) @*/)
 	// @ sl.CombineRange_Bytes(buf, offset, len(buf), writePerm)
 	// @ sl.CombineRange_Bytes(ubuf, int(slayers.CmnHdrLen+s.AddrHdrLenSpecInternal()), int(s.HdrLen*slayers.LineLen), writePerm)
 	if err != nil {
 		return 0, err
 	}
-	offset += s.Path.Len( /*@ ubuf @*/ )
+	offset += s.Path.Len( /*@ s.UBPath(ubuf) @*/ )
 	return offset, nil
 }
 
