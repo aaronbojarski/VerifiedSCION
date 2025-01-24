@@ -122,7 +122,7 @@ func ComputeAuthCMAC(
 }
 
 // @ preserves acc(sl.Bytes(key, 0, len(key)), R50)
-// @ ensures   retErr == nil ==> m.Mem() && typeOf(m) == type[*cmac.cmac]
+// @ ensures   retErr == nil ==> m != nil && m.Mem() && m.Size() == aes.BlockSize
 // @ ensures   retErr != nil ==> retErr.ErrorMem()
 // @ decreases
 func initCMAC(key []byte) (m hash.Hash, retErr error) {

@@ -25,13 +25,9 @@ pred (c *cmac) Mem() {
 	acc(c)
 }
 
-decreases
-pure func (d *cmac) BlockSizeSpec() int
-
-preserves c != nil && c.Mem()
-ensures   typeOf(h) == type[*cmac]
-ensures   err == nil ==> h.Mem()
-ensures   err == nil ==> h.BlockSizeSpec() == c.BlockSize()
+requires  c != nil && c.Mem()
+ensures   err == nil ==> h != nil && h.Mem()
+ensures   err == nil ==> h.Size() == old(c.BlockSize())
 ensures   err != nil ==> err.ErrorMem()
 decreases
 func New(c cipher.Block) (h hash.Hash, err error)
@@ -42,7 +38,14 @@ ensures   err != nil ==> err.ErrorMem()
 decreases
 func (d *cmac) Write(p []byte) (n int, err error)
 
-requires  sl.Bytes(b, 0, len(b))
-ensures   cap(b) >= d.BlockSizeSpec() ==> sl.Bytes(b, 0, d.BlockSizeSpec())
+preserves acc(d.Mem(), 1/1000)
+requires acc(b)
+ensures  acc(res) && len(res) == d.Size() + len(b)
+ensures  d.Size() + len(b) <= cap(b) ==> res[0:len(b)] === b
 decreases
-func (d *cmac) Sum(b []byte) []byte 
+func (d *cmac) Sum(b []byte) (res []byte)
+
+requires acc(d.Mem(), _)
+ensures  res >= 0
+decreases
+pure func(d *cmac) Size() (res int)
