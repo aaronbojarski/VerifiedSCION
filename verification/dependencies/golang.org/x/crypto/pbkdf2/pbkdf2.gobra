@@ -19,7 +19,7 @@ pbkdf2.Key.
 
 // +gobra
 
-package pbkdf2 // import "golang.org/x/crypto/pbkdf2"
+package pbkdf2
 
 import "hash"
 
