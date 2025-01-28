@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +gobra
+
 package drkey
 
 import (
@@ -35,24 +37,24 @@ const (
 	SCMP    = Protocol(pb.Protocol_PROTOCOL_SCMP)
 )
 
+// TODO (VerifiedSCION): Changed this struct with embedded field to simple type definition.
 // Epoch represents a validity period.
-type Epoch struct {
-	cppki.Validity
-}
+type Epoch cppki.Validity
 
 // NewEpoch constructs an Epoch from its uint32 encoded begin and end parts.
+// @ decreases
 func NewEpoch(begin, end uint32) Epoch {
 	return Epoch{
-		cppki.Validity{
-			NotBefore: util.SecsToTime(begin),
-			NotAfter:  util.SecsToTime(end),
-		},
+		NotBefore: util.SecsToTime(begin),
+		NotAfter:  util.SecsToTime(end),
 	}
 }
 
 // Protocol is the 2-byte size protocol identifier
 type Protocol uint16
 
+// @ trusted
+// @ requires false
 func (p Protocol) String() string {
 	name, ok := pb.Protocol_name[int32(p)]
 	if !ok {
@@ -64,11 +66,15 @@ func (p Protocol) String() string {
 // IsPredefined checks whether this is a well-known, built-in protocol
 // identifier, i.e. Generic, SCMP or DNS. Returns false for all other
 // protocol identifiers ("niche protocols").
+// @ trusted
+// @ requires false
 func (p Protocol) IsPredefined() bool {
 	_, ok := pb.Protocol_name[int32(p)]
 	return ok
 }
 
+// @ trusted
+// @ requires false
 func ProtocolStringToId(protocol string) (Protocol, bool) {
 	id, ok := pb.Protocol_value[protocol]
 	return Protocol(id), ok
@@ -97,6 +103,8 @@ type SecretValue struct {
 }
 
 // DeriveSV constructs a valid SV. asSecret is typically the AS master secret.
+// @ trusted
+// @ requires false
 func DeriveSV(protoID Protocol, epoch Epoch, asSecret []byte) (SecretValue, error) {
 	msLen := len(asSecret)
 	if msLen == 0 {

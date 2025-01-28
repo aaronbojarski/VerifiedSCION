@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +gobra
+
 package cppki
 
 import (
@@ -31,16 +33,19 @@ type Validity struct {
 }
 
 // Contains indicates whether the provided time is inside the validity period.
+// @ decreases
 func (v Validity) Contains(t time.Time) bool {
 	return !t.Before(v.NotBefore) && !t.After(v.NotAfter)
 }
 
 // Covers indicates whether the other validity is covered by this validity.
+// @ decreases
 func (v Validity) Covers(other Validity) bool {
 	return !other.NotBefore.Before(v.NotBefore) && !other.NotAfter.After(v.NotAfter)
 }
 
 // Validate checks that NotAfter is after NotBefore.
+// @ decreases
 func (v Validity) Validate() error {
 	if !v.NotAfter.After(v.NotBefore) {
 		return ErrInvalidValidityPeriod
@@ -49,10 +54,13 @@ func (v Validity) Validate() error {
 }
 
 // IsZero indicates whether the validity period is zero.
+// @ decreases
 func (v Validity) IsZero() bool {
 	return v.NotBefore.IsZero() && v.NotAfter.IsZero()
 }
 
+// @ trusted
+// @ requires false
 func (v Validity) String() string {
 	return fmt.Sprintf(
 		"not_before=%s, not_after=%s",
