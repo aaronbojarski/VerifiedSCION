@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +gobra
+
 package drkeyutil
 
 import (
@@ -29,6 +31,7 @@ type FakeProvider struct {
 	AcceptanceWindow time.Duration
 }
 
+// @ decreases
 func (p *FakeProvider) GetASHostKey(
 	validTime time.Time,
 	_ addr.IA,
@@ -44,6 +47,7 @@ func (p *FakeProvider) GetASHostKey(
 	}, nil
 }
 
+// @ decreases
 func (p *FakeProvider) GetKeyWithinAcceptanceWindow(
 	t time.Time,
 	timestamp uint64,
@@ -80,6 +84,7 @@ func (p *FakeProvider) GetKeyWithinAcceptanceWindow(
 	}
 }
 
+// @ decreases
 func (p *FakeProvider) getASHostTriple(
 	validTime time.Time,
 	_ addr.IA,
@@ -108,6 +113,7 @@ func (p *FakeProvider) getASHostTriple(
 	}, nil
 }
 
+// @ decreases
 func newEpoch(idx int64, duration int64) drkey.Epoch {
 	begin := uint32(idx * duration)
 	end := begin + uint32(duration)
