@@ -1,0 +1,51 @@
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// CMAC message authentication code, defined in
+// NIST Special Publication SP 800-38B.
+
+// +gobra
+
+package cmac
+
+import (
+	"crypto/cipher"
+	"hash"
+
+	def "github.com/scionproto/scion/verification/utils/definitions"
+	sl "github.com/scionproto/scion/verification/utils/slices"
+)
+
+type cmac struct {
+	privateField def.PrivateField
+}
+
+pred (c *cmac) Mem() {
+	acc(c)
+}
+
+requires  c != nil && c.Mem()
+ensures   err == nil ==> h != nil && h.Mem()
+ensures   err == nil ==> h.Size() == old(c.BlockSize())
+ensures   err != nil ==> err.ErrorMem()
+decreases
+func New(c cipher.Block) (h hash.Hash, err error)
+
+preserves d.Mem() 
+preserves acc(p, 1/1000)
+ensures   err != nil ==> err.ErrorMem()
+decreases
+func (d *cmac) Write(p []byte) (n int, err error)
+
+preserves acc(d.Mem(), 1/1000)
+requires acc(b)
+ensures  acc(res) && len(res) == d.Size() + len(b)
+ensures  d.Size() + len(b) <= cap(b) ==> res[0:len(b)] === b
+decreases
+func (d *cmac) Sum(b []byte) (res []byte)
+
+requires acc(d.Mem(), _)
+ensures  res >= 0
+decreases
+pure func(d *cmac) Size() (res int)
