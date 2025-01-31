@@ -1,0 +1,17 @@
+// +gobra
+
+package protoimpl
+
+import . "github.com/scionproto/scion/verification/utils/definitions"
+
+const (
+	MaxVersion = 36
+	MinVersion = 0
+)
+
+type EnforceVersion uint
+
+type EnumInfo struct {
+    privateFields PrivateField
+}
+

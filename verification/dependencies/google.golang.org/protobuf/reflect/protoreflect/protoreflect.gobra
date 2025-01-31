@@ -1,0 +1,14 @@
+// +gobra
+
+package protoreflect
+
+type EnumDescriptor interface {
+}
+
+type EnumType interface {
+}
+
+type EnumNumber int32
+
+type FileDescriptor interface {
+}

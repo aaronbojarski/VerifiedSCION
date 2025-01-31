@@ -4,6 +4,8 @@
 // 	protoc        v3.21.10
 // source: proto/drkey/v1/drkey.proto
 
+// +gobra
+
 package drkey
 
 import (
@@ -39,29 +41,41 @@ var (
 	}
 )
 
+// @ trusted
+// @ requires false
 func (x Protocol) Enum() *Protocol {
 	p := new(Protocol)
 	*p = x
 	return p
 }
 
+// @ trusted
+// @ requires false
 func (x Protocol) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
+// @ trusted
+// @ requires false
 func (Protocol) Descriptor() protoreflect.EnumDescriptor {
 	return file_proto_drkey_v1_drkey_proto_enumTypes[0].Descriptor()
 }
 
+// @ trusted
+// @ requires false
 func (Protocol) Type() protoreflect.EnumType {
 	return &file_proto_drkey_v1_drkey_proto_enumTypes[0]
 }
 
+// @ trusted
+// @ requires false
 func (x Protocol) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
 // Deprecated: Use Protocol.Descriptor instead.
+// @ trusted
+// @ requires false
 func (Protocol) EnumDescriptor() ([]byte, []int) {
 	return file_proto_drkey_v1_drkey_proto_rawDescGZIP(), []int{0}
 }
@@ -87,6 +101,8 @@ var (
 	file_proto_drkey_v1_drkey_proto_rawDescData = file_proto_drkey_v1_drkey_proto_rawDesc
 )
 
+// @ trusted
+// @ requires false
 func file_proto_drkey_v1_drkey_proto_rawDescGZIP() []byte {
 	file_proto_drkey_v1_drkey_proto_rawDescOnce.Do(func() {
 		file_proto_drkey_v1_drkey_proto_rawDescData = protoimpl.X.CompressGZIP(file_proto_drkey_v1_drkey_proto_rawDescData)
@@ -107,6 +123,8 @@ var file_proto_drkey_v1_drkey_proto_depIdxs = []int32{
 }
 
 func init() { file_proto_drkey_v1_drkey_proto_init() }
+// @ trusted
+// @ requires false
 func file_proto_drkey_v1_drkey_proto_init() {
 	if File_proto_drkey_v1_drkey_proto != nil {
 		return
