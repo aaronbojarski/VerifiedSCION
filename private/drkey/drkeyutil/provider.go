@@ -24,6 +24,7 @@ import (
 	"github.com/scionproto/scion/pkg/private/serrors"
 	"github.com/scionproto/scion/pkg/scrypto/cppki"
 	"github.com/scionproto/scion/pkg/spao"
+	// @ . "github.com/scionproto/scion/verification/utils/definitions"
 )
 
 type FakeProvider struct {
@@ -31,6 +32,8 @@ type FakeProvider struct {
 	AcceptanceWindow time.Duration
 }
 
+// @ requires  acc(p, R50)
+// @ requires  p.EpochDuration >= time.Second
 // @ decreases
 func (p *FakeProvider) GetASHostKey(
 	validTime time.Time,
@@ -47,6 +50,8 @@ func (p *FakeProvider) GetASHostKey(
 	}, nil
 }
 
+// @ requires  acc(p, R45)
+// @ requires  p.EpochDuration >= time.Second
 // @ decreases
 func (p *FakeProvider) GetKeyWithinAcceptanceWindow(
 	t time.Time,
@@ -84,12 +89,15 @@ func (p *FakeProvider) GetKeyWithinAcceptanceWindow(
 	}
 }
 
+// @ requires  acc(p, R50)
+// @ requires  p.EpochDuration >= time.Second
+// @ ensures   acc(&k[0]) && acc(&k[1]) && acc(&k[2])
 // @ decreases
 func (p *FakeProvider) getASHostTriple(
 	validTime time.Time,
 	_ addr.IA,
 	_ addr.Host,
-) ([]drkey.ASHostKey, error) {
+) (k []drkey.ASHostKey, err error) {
 
 	duration := int64(p.EpochDuration / time.Second)
 	idxCurrent := validTime.Unix() / duration
