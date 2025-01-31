@@ -16,11 +16,6 @@
 
 package spao
 
-import (
-	. "github.com/scionproto/scion/verification/utils/definitions"
-	"github.com/scionproto/scion/verification/utils/slices"
-)
-
 ghost
 requires acc(m.ScionLayer.Mem(ubuf), _)
 decreases

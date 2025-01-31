@@ -38,8 +38,8 @@ ensures   err != nil ==> err.ErrorMem()
 decreases
 func (d *cmac) Write(p []byte) (n int, err error)
 
-preserves acc(d.Mem(), 1/1000)
 requires acc(b)
+preserves acc(d.Mem(), 1/1000)
 ensures  acc(res) && len(res) == d.Size() + len(b)
 ensures  d.Size() + len(b) <= cap(b) ==> res[0:len(b)] === b
 decreases

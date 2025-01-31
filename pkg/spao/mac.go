@@ -226,9 +226,9 @@ func serializeAuthenticatedData(
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
 			opt.SPI().Direction() == slayers.PacketAuthReceiverSide) {
-		// @ dstAddrBytes := s.DstAddrType.Length()
-		// @ ubufOffset := slayers.CmnHdrLen + 2 * addr.IABytes
-		// @ copyOffset := offset
+		// @ ghost dstAddrBytes := s.DstAddrType.Length()
+		// @ ghost ubufOffset := slayers.CmnHdrLen + 2 * addr.IABytes
+		// @ ghost copyOffset := offset
 		// @ sl.SplitRange_Bytes(buf, copyOffset, len(buf), writePerm)
 		// @ sl.SplitRange_Bytes(ubuf, ubufOffset, ubufOffset+dstAddrBytes, R10)
 		// @ unfold sl.Bytes(buf[copyOffset:], 0, len(buf[copyOffset:]))
@@ -242,9 +242,9 @@ func serializeAuthenticatedData(
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
 			opt.SPI().Direction() == slayers.PacketAuthSenderSide) {
-		// @ srcAddrBytes := s.SrcAddrType.Length()
-		// @ ubufOffset := slayers.CmnHdrLen + 2 * addr.IABytes + s.DstAddrType.Length()
-		// @ copyOffset := offset
+		// @ ghost srcAddrBytes := s.SrcAddrType.Length()
+		// @ ghost ubufOffset := slayers.CmnHdrLen + 2 * addr.IABytes + s.DstAddrType.Length()
+		// @ ghost copyOffset := offset
 		// @ sl.SplitRange_Bytes(buf, copyOffset, len(buf), writePerm)
 		// @ sl.SplitRange_Bytes(ubuf, ubufOffset, ubufOffset+srcAddrBytes, R10)
 		// @ unfold sl.Bytes(buf[copyOffset:], 0, len(buf[copyOffset:]))
@@ -358,7 +358,7 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 		// @ fold sl.Bytes(buf, 0, len(buf))
 		offset += 8
 	}
-	// @ oldOffset := offset
+	// @ ghost oldOffset := offset
 	// @ invariant base.WeaklyValid()
 	// @ invariant 0 <= i && i <= base.NumINF
 	// @ invariant i == 0 ==> offset == oldOffset
@@ -368,7 +368,7 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 	// @ invariant sl.Bytes(buf, 0, len(buf))
 	// @ decreases base.NumINF - i
 	for i := 0; i < base.NumINF; i++ {
-		// @ oldOffsetInner := offset
+		// @ ghost oldOffsetInner := offset
 		// @ invariant base.WeaklyValid()
 		// @ invariant i < base.NumINF
 		// @ invariant 0 <= j && j <= int(base.PathMeta.SegLen[i])
