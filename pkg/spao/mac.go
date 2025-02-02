@@ -141,7 +141,7 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves acc(s.Mem(ubuf), R8)
-// @ preserves s.ValidPathMetaData(ubuf)
+// @ preserves s.WeaklyValidPathMetaData(ubuf)
 // @ preserves acc(opt.EndToEndOption, R48)
 // @ preserves len(opt.OptData) >= 12
 // @ preserves acc(sl.Bytes(opt.OptData, 0, len(opt.OptData)), R49)
