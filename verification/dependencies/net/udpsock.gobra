@@ -10,6 +10,7 @@
 package net
 
 import "time"
+import "net/netip"
 
 import . "github.com/scionproto/scion/verification/utils/definitions"
 import sl "github.com/scionproto/scion/verification/utils/slices"
@@ -140,3 +141,12 @@ preserves acc(sl.Bytes(b, 0, len(b)), R15)
 ensures   err == nil ==> 0 <= n && n <= len(b)
 ensures   err != nil ==> err.ErrorMem()
 func (c *UDPConn) Write(b []byte) (n int, err error)
+
+ensures acc(u.Mem())
+decreases _
+func UDPAddrFromAddrPort(addr netip.AddrPort) (u *UDPAddr)
+
+ensures   err == nil ==> 0 <= n && n <= len(b)
+ensures   err != nil ==> err.ErrorMem()
+decreases _
+func (c *UDPConn) WriteToUDPAddrPort(b []byte, addr netip.AddrPort) (n int, err error)

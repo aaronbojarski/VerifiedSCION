@@ -43,15 +43,44 @@ type Messages []ipv4.Message
 
 // Conn describes the API for an underlay socket
 type Conn interface {
-	ReadBatch(Messages) (int, error)
-	WriteTo([]byte, netip.AddrPort) (int, error)
-	WriteBatch(Messages, int) (int, error)
+	//@ pred Mem()
+	//@ requires  acc(Mem(), _)
+	//@ preserves forall i int :: { &m[i] } 0 <= i && i < len(m) ==> m[i].Mem()
+	//@ ensures   err == nil ==> 0 <= n && n <= len(m)
+	//@ ensures   err != nil ==> err.ErrorMem()
+	ReadBatch(m Messages) (n int, err error)
+	//@ requires  acc(Mem(), _)
+	//@ preserves acc(sl.Bytes(b, 0, len(b)), R10)
+	//@ ensures   err == nil ==> 0 <= n && n <= len(b)
+	//@ ensures   err != nil ==> err.ErrorMem()
+	WriteTo(b []byte, dst netip.AddrPort) (n int, err error)
+	//@ requires  acc(Mem(), _)
+	//@ preserves forall i int :: { &m[i] } 0 <= i && i < len(m) ==> acc(m[i].Mem(), R10)
+	//@ ensures   err == nil ==> 0 <= n && n <= len(m)
+	//@ ensures   err != nil ==> err.ErrorMem()
+	WriteBatch(m Messages, k int) (n int, err error)
+	//@ preserves acc(Mem(), R10)
+	//@ decreases
 	LocalAddr() netip.AddrPort
+	//@ preserves acc(Mem(), R10)
+	//@ decreases
 	RemoteAddr() netip.AddrPort
-	SetReadDeadline(time.Time) error
-	SetWriteDeadline(time.Time) error
-	SetDeadline(time.Time) error
-	Close() error
+	//@ preserves Mem()
+	//@ ensures   err != nil ==> err.ErrorMem()
+	//@ decreases
+	SetReadDeadline(time.Time) (err error)
+	//@ preserves Mem()
+	//@ ensures   err != nil ==> err.ErrorMem()
+	//@ decreases
+	SetWriteDeadline(time.Time) (err error)
+	//@ preserves Mem()
+	//@ ensures   err != nil ==> err.ErrorMem()
+	//@ decreases
+	SetDeadline(time.Time) (err error)
+	//@ requires Mem()
+	//@ ensures  err != nil ==> err.ErrorMem()
+	//@ decreases
+	Close() (err error)
 }
 
 // Config customizes the behavior of an underlay socket.
@@ -67,7 +96,12 @@ type Config struct {
 // New opens a new underlay socket on the specified addresses.
 //
 // The config can be used to customize socket behavior.
-func New(listen, remote netip.AddrPort, cfg *Config) (Conn, error) {
+// @ requires cfg.Mem()
+// @ requires listen.IsValidSpec() || remote.IsValidSpec()
+// @ ensures  e == nil ==> res.Mem()
+// @ ensures  e != nil ==> e.ErrorMem()
+// @ decreases
+func New(listen, remote netip.AddrPort, cfg *Config) (res Conn, e error) {
 	a := listen
 	if remote.IsValid() {
 		a = remote
@@ -75,6 +109,8 @@ func New(listen, remote netip.AddrPort, cfg *Config) (Conn, error) {
 	if !a.IsValid() {
 		panic("either listen or remote must be set")
 	}
+	// @ assert remote.IsValidSpec() ==> a == remote
+	// @ assert !remote.IsValidSpec() ==> a == listen
 	if a.Addr().Is4() {
 		return newConnUDPIPv4(listen, remote, cfg)
 	}
@@ -86,7 +122,11 @@ type connUDPIPv4 struct {
 	pconn *ipv4.PacketConn
 }
 
-func newConnUDPIPv4(listen, remote netip.AddrPort, cfg *Config) (*connUDPIPv4, error) {
+// @ requires cfg.Mem()
+// @ ensures  e == nil ==> res.Mem()
+// @ ensures  e != nil ==> e.ErrorMem()
+// @ decreases
+func newConnUDPIPv4(listen, remote netip.AddrPort, cfg *Config) (res *connUDPIPv4, e error) {
 	cc := &connUDPIPv4{}
 	if err := cc.initConnUDP("udp4", listen, remote, cfg); err != nil {
 		return nil, err
@@ -100,7 +140,13 @@ func newConnUDPIPv4(listen, remote netip.AddrPort, cfg *Config) (*connUDPIPv4, e
 
 // ReadBatch reads up to len(msgs) packets, and stores them in msgs.
 // It returns the number of packets read, and an error if any.
-func (c *connUDPIPv4) ReadBatch(msgs Messages) (int, error) {
+// @ requires  acc(c.Mem(), _)
+// @ preserves forall i int :: { &msgs[i] } 0 <= i && i < len(msgs) ==> msgs[i].Mem()
+// @ ensures   errRet == nil ==> 0 <= nRet && nRet <= len(msgs)
+// @ ensures   errRet != nil ==> errRet.ErrorMem()
+func (c *connUDPIPv4) ReadBatch(msgs Messages) (nRet int, errRet error) {
+	//@ unfold acc(c.Mem(), _)
+	// (VerifiedSCION) 1 is the length of the buffers of the messages in msgs
 	n, err := c.pconn.ReadBatch(msgs, syscallMSG_WAITFORONE)
 	return n, err
 }
@@ -148,7 +194,11 @@ type connUDPIPv6 struct {
 	pconn *ipv6.PacketConn
 }
 
-func newConnUDPIPv6(listen, remote netip.AddrPort, cfg *Config) (*connUDPIPv6, error) {
+// @ requires cfg.Mem()
+// @ ensures  e == nil ==> res.Mem()
+// @ ensures  e != nil ==> e.ErrorMem()
+// @ decreases
+func newConnUDPIPv6(listen, remote netip.AddrPort, cfg *Config) (res *connUDPIPv6, e error) {
 	cc := &connUDPIPv6{}
 	if err := cc.initConnUDP("udp6", listen, remote, cfg); err != nil {
 		return nil, err
@@ -218,10 +268,15 @@ type connUDPBase struct {
 	closed bool
 }
 
+// @ requires acc(cc)
+// @ requires cfg.Mem()
+// @ ensures  errRet == nil ==> cc.Mem()
+// @ ensures  errRet != nil ==> errRet.ErrorMem()
+// @ decreases
 func (cc *connUDPBase) initConnUDP(
 	network string,
 	laddr, raddr netip.AddrPort,
-	cfg *Config) error {
+	cfg *Config) (errRet error) {
 
 	var c *net.UDPConn
 	var err error
@@ -321,22 +376,42 @@ func (cc *connUDPBase) initConnUDP(
 	return nil
 }
 
-func (c *connUDPBase) Write(b []byte) (int, error) {
+// @ preserves acc(c.Mem(), _)
+// @ preserves acc(sl.Bytes(b, 0, len(b)), R15)
+// @ ensures   c.GetUnderlyingConn() == old(c.GetUnderlyingConn())
+// @ ensures   err == nil ==> 0 <= n && n <= len(b)
+// @ ensures   err != nil ==> err.ErrorMem()
+func (c *connUDPBase) Write(b []byte) (n int, err error) {
+	//@ unfold acc(c.Mem(), _)
 	return c.conn.Write(b)
 }
 
-func (c *connUDPBase) WriteTo(b []byte, dst netip.AddrPort) (int, error) {
+// @ preserves acc(c.Mem(), _)
+// @ preserves acc(sl.Bytes(b, 0, len(b)), R15)
+// @ ensures   c.GetUnderlyingConn() == old(c.GetUnderlyingConn())
+// @ ensures   err == nil ==> 0 <= n && n <= len(b)
+// @ ensures   err != nil ==> err.ErrorMem()
+func (c *connUDPBase) WriteTo(b []byte, dst netip.AddrPort) (n int, err error) {
+	//@ unfold acc(c.Mem(), _)
 	if c.Remote.IsValid() {
 		return c.conn.Write(b)
 	}
 	return c.conn.WriteToUDPAddrPort(b, dst)
 }
 
+// @ preserves acc(c.MemWithoutConn(), R16)
+// @ decreases
 func (c *connUDPBase) LocalAddr() netip.AddrPort {
+	//@ unfold acc(c.MemWithoutConn(), R16)
+	//@ defer fold acc(c.MemWithoutConn(), R16)
 	return c.Listen
 }
 
+// @ preserves acc(c.MemWithoutConn(), R16)
+// @ decreases
 func (c *connUDPBase) RemoteAddr() netip.AddrPort {
+	//@ unfold acc(c.MemWithoutConn(), R16)
+	//@ defer fold acc(c.MemWithoutConn(), R16)
 	return c.Remote
 }
 

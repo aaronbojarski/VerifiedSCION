@@ -213,7 +213,7 @@ func (o *Path) Reverse( /*@ ghost ubuf []byte @*/ ) (p path.Path, err error) {
 		return nil, serrors.Wrap("converting to scion path", err)
 	}
 	// increment the path, since we are at the receiver side.
-	if err := sp.IncPath(); err != nil {
+	if err := sp.IncPath( /*@ ubuf @*/ ); err != nil {
 		return nil, serrors.Wrap("incrementing path", err)
 	}
 	return sp.Reverse( /*@ ubuf @*/ )

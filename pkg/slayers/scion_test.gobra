@@ -17,92 +17,60 @@
 package slayers
 
 import (
-	"net"
+	"encoding/binary"
+	"net/netip"
+
 	sl "github.com/scionproto/scion/verification/utils/slices"
 	"github.com/scionproto/scion/pkg/addr"
+	"github.com/scionproto/scion/pkg/private/serrors"
 )
 
-// These tests show the behavior of SetSrcAddr when an IPAddr is passed
+// These tests show the behavior of SetSrcAddr when an addr.Host of type addr.HostTypeSVC is passed
 requires acc(&s.RawSrcAddr)
 requires acc(&s.SrcAddrType)
-requires acc(src.Mem())
-func testSrcSetter(s *SCION, src *net.IPAddr) {
-	res := s.SetSrcAddr(src, false)
-	// unfolding src.Mem() grants us permission to s.RawSrcAddr since they are aliased
-	unfold src.Mem()
-	assert forall i int :: { &s.RawSrcAddr[i] } 0 <= i && i < len(s.RawSrcAddr) ==> acc(&s.RawSrcAddr[i])
-}
-
-requires acc(&s.RawSrcAddr)
-requires acc(&s.SrcAddrType)
-requires acc(src.Mem(), _)
-func testSrcSetterWildcard(s *SCION, src *net.IPAddr) {
-	res := s.SetSrcAddr(src, true)
-	// in the wildcard case we have wildcard access to the address in the SCION struct
-	assert acc(sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr)), _)
-}
-
-// These tests show the behavior of SetSrcAddr when an HostSVC is passed
-requires acc(&s.RawSrcAddr)
-requires acc(&s.SrcAddrType)
-requires acc(src.Mem())
-func testSrcSetterSVC(s *SCION, src addr.HostSVC) {
-	res := s.SetSrcAddr(src, false)
-	assert src.Mem()
-	// if the address is HostSVC we have the whole permission anyway in a slice predicate
+requires src.Type() == addr.HostTypeSVC
+func testSrcSetterSVC(s *SCION, src addr.Host) {
+	res := s.SetSrcAddr(src)
 	unfold sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr))
 	assert forall i int :: { &s.RawSrcAddr[i] } 0 <= i && i < len(s.RawSrcAddr) ==> acc(&s.RawSrcAddr[i])
 }
 
-requires acc(&s.RawSrcAddr)
-requires acc(&s.SrcAddrType)
-requires acc(src.Mem(), _)
-func testSrcSetterSVCWildcard(s *SCION, src addr.HostSVC) {
-	res := s.SetSrcAddr(src, true)
-	// if the address is HostSVC we have the whole permission anyway in a slice predicate
-	unfold sl.Bytes(s.RawSrcAddr, 0, len(s.RawSrcAddr))
-	assert forall i int :: { &s.RawSrcAddr[i] } 0 <= i && i < len(s.RawSrcAddr) ==> acc(&s.RawSrcAddr[i])
-}
-
-
-// These tests show the behavior of SetDstAddr when an IPAddr is passed
+// These tests show the behavior of SetDstAddr when an addr.Host of type addr.HostTypeSVC is passed
 requires acc(&s.RawDstAddr)
 requires acc(&s.DstAddrType)
-requires acc(dst.Mem())
-func testDstSetter(s *SCION, dst *net.IPAddr) {
-	res := s.SetDstAddr(dst, false)
-	// unfolding dst.Mem() grants us permission to s.RawDstAddr since they are aliased
-	unfold dst.Mem()
-	assert forall i int :: { &s.RawDstAddr[i] } 0 <= i && i < len(s.RawDstAddr) ==> acc(&s.RawDstAddr[i])
-}
-
-requires acc(&s.RawDstAddr)
-requires acc(&s.DstAddrType)
-requires acc(dst.Mem(), _)
-func testDstSetterWildcard(s *SCION, dst *net.IPAddr) {
-	res := s.SetDstAddr(dst, true)
-	// in the wildcard case we have wildcard access to the address in the SCION struct
-	assert acc(sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr)), _)
-}
-
-// These tests show the behavior of SetDstAddr when an HostSVC is passed
-requires acc(&s.RawDstAddr)
-requires acc(&s.DstAddrType)
-requires acc(dst.Mem())
-func testDstSetterSVC(s *SCION, dst addr.HostSVC) {
-	res := s.SetDstAddr(dst, false)
-	assert dst.Mem()
-	// if the address is HostSVC we have the whole permission anyway in a slice predicate
+requires dst.Type() == addr.HostTypeSVC
+func testDstSetterSVC(s *SCION, dst addr.Host) {
+	res := s.SetDstAddr(dst)
 	unfold sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr))
 	assert forall i int :: { &s.RawDstAddr[i] } 0 <= i && i < len(s.RawDstAddr) ==> acc(&s.RawDstAddr[i])
 }
 
-requires acc(&s.RawDstAddr)
-requires acc(&s.DstAddrType)
-requires acc(dst.Mem(), _)
-func testDstSetterSVCWildcard(s *SCION, dst addr.HostSVC) {
-	res := s.SetDstAddr(dst, true)
-	// if the address is HostSVC we have the whole permission anyway in a slice predicate
-	unfold sl.Bytes(s.RawDstAddr, 0, len(s.RawDstAddr))
-	assert forall i int :: { &s.RawDstAddr[i] } 0 <= i && i < len(s.RawDstAddr) ==> acc(&s.RawDstAddr[i])
+// Gobra does not support break inside switch statement. 
+// Therefore the body of the PackAddr function is refactored and verified here.
+ensures   IsHostTypeSVC(host) ==> err == nil
+ensures   err == nil ==> IsHostTypeIP(host) || IsHostTypeSVC(host)
+ensures   err != nil ==> err.ErrorMem()
+ensures   err == nil ==> sl.Bytes(b, 0, len(b))
+decreases
+func PackAddrBreakRewrite(host addr.Host) (addrtyp AddrType, b []byte, err error) {
+	switch host.Type() {
+	case addr.HostTypeIP:
+		// The IP is potentially IPv4-in-IPv6. We need to unmap it to ensure
+		// we only have true IPv4 or IPv6 addresses.
+		ip := host.IP().Unmap()
+		if !ip.IsValid() {
+			// (VerifiedSCION) Gobra does not support break inside switch statement.
+			return 0, nil, serrors.New("unsupported address", "addr", host)
+		}
+		if ip.Is6() {
+			return T16Ip, ip.AsSlice(), nil
+		}
+		return T4Ip, ip.AsSlice(), nil
+	case addr.HostTypeSVC:
+		raw := make([]byte, 4)
+		binary.BigEndian.PutUint16(raw, uint16(host.SVC()))
+		fold sl.Bytes(raw, 0, len(raw))
+		return T4Svc, raw, nil
+	}
+	return 0, nil, serrors.New("unsupported address", "addr", host)
 }
