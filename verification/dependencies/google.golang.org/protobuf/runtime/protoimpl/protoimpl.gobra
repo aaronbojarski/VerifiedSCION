@@ -2,7 +2,10 @@
 
 package protoimpl
 
-import . "github.com/scionproto/scion/verification/utils/definitions"
+import (
+	. "github.com/scionproto/scion/verification/utils/definitions"
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+)
 
 const (
 	MaxVersion = 36
@@ -15,3 +18,34 @@ type EnumInfo struct {
     privateFields PrivateField
 }
 
+type MessageInfo struct {
+    privateFields PrivateField
+}
+
+type ExtensionInfo struct {
+    privateFields PrivateField
+}
+
+type TypeBuilder struct {
+	File DescBuilder
+	GoTypes []any
+	DependencyIndexes []int32
+	EnumInfos []EnumInfo
+	privateFields PrivateField
+}
+
+type DescBuilder struct {
+	GoPackagePath string
+	RawDescriptor []byte
+	NumEnums int32
+	NumMessages int32
+	NumExtensions int32
+	NumServices int32
+}
+
+type Out struct {
+	File protoreflect.FileDescriptor
+}
+
+decreases _
+func (tb TypeBuilder) Build() (out Out)

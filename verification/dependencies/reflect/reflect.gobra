@@ -1,3 +1,10 @@
 // +gobra
 
 package reflect
+
+decreases _
+func TypeOf(i any) Type
+
+type Type interface {
+    PkgPath() string
+}
