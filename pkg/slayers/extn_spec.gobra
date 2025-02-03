@@ -17,7 +17,7 @@
 package slayers
 
 import (
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 
 	. "github.com/scionproto/scion/verification/utils/definitions"
 	// sl "github.com/scionproto/scion/verification/utils/slices"
