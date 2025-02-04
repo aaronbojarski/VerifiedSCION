@@ -80,7 +80,7 @@ type Path struct {
 
 // SerializeTo serializes the Path into buffer b. On failure, an error is returned, otherwise
 // SerializeTo will return nil.
-// @ preserves acc(p.Mem(ubuf), R1)
+// @ preserves acc(p.Mem(ubuf), R10)
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves sl.Bytes(b, 0, len(b))
 // @ ensures   r != nil ==> r.ErrorMem()
@@ -94,8 +94,8 @@ func (p *Path) SerializeTo(b []byte /*@, ghost ubuf []byte @*/) (r error) {
 		return serrors.New("buffer too small to serialize path.", "expected", int(p.Len( /*@ ubuf @*/ )),
 			"actual", len(b))
 	}
-	//@ unfold acc(p.Mem(ubuf), R1)
-	//@ defer fold acc(p.Mem(ubuf), R1)
+	//@ unfold acc(p.Mem(ubuf), R10)
+	//@ defer fold acc(p.Mem(ubuf), R10)
 	if len(p.PHVF) != HVFLen {
 		return serrors.New("invalid length of PHVF", "expected", int(HVFLen), "actual", int(len(p.PHVF)))
 	}
@@ -112,19 +112,19 @@ func (p *Path) SerializeTo(b []byte /*@, ghost ubuf []byte @*/) (r error) {
 	//@ sl.SplitByIndex_Bytes(b, PktIDLen, len(b), PktIDLen+HVFLen, writePerm)
 	//@ sl.Reslice_Bytes(b, PktIDLen, PktIDLen+HVFLen, writePerm)
 	//@ unfold sl.Bytes(b[PktIDLen:(PktIDLen+HVFLen)], 0, HVFLen)
-	//@ unfold acc(sl.Bytes(p.PHVF, 0, len(p.PHVF)), R2)
-	copy(b[PktIDLen:(PktIDLen+HVFLen)], p.PHVF /*@, R3 @*/)
+	//@ unfold acc(sl.Bytes(p.PHVF, 0, len(p.PHVF)), R12)
+	copy(b[PktIDLen:(PktIDLen+HVFLen)], p.PHVF /*@, R13 @*/)
 	//@ fold sl.Bytes(b[PktIDLen:(PktIDLen+HVFLen)], 0, HVFLen)
-	//@ fold acc(sl.Bytes(p.PHVF, 0, len(p.PHVF)), R2)
+	//@ fold acc(sl.Bytes(p.PHVF, 0, len(p.PHVF)), R12)
 	//@ sl.Unslice_Bytes(b, PktIDLen, PktIDLen+HVFLen, writePerm)
 	//@ sl.CombineAtIndex_Bytes(b, 0, PktIDLen+HVFLen, PktIDLen, writePerm)
 	//@ sl.SplitByIndex_Bytes(b, PktIDLen+HVFLen, len(b), MetadataLen, writePerm)
 	//@ sl.Reslice_Bytes(b, PktIDLen+HVFLen, MetadataLen, writePerm)
-	//@ unfold acc(sl.Bytes(p.LHVF, 0, len(p.LHVF)), R3)
+	//@ unfold acc(sl.Bytes(p.LHVF, 0, len(p.LHVF)), R13)
 	//@ unfold sl.Bytes(b[(PktIDLen+HVFLen):MetadataLen], 0, HVFLen)
-	copy(b[(PktIDLen+HVFLen):MetadataLen], p.LHVF /*@, R3 @*/)
+	copy(b[(PktIDLen+HVFLen):MetadataLen], p.LHVF /*@, R13 @*/)
 	//@ fold sl.Bytes(b[(PktIDLen+HVFLen):MetadataLen], 0, HVFLen)
-	//@ fold acc(sl.Bytes(p.LHVF, 0, len(p.LHVF)), R3)
+	//@ fold acc(sl.Bytes(p.LHVF, 0, len(p.LHVF)), R13)
 	//@ sl.Unslice_Bytes(b, PktIDLen+HVFLen, MetadataLen, writePerm)
 	//@ sl.CombineAtIndex_Bytes(b, 0, MetadataLen, PktIDLen+HVFLen, writePerm)
 	//@ sl.Reslice_Bytes(b, MetadataLen, len(b), writePerm)
@@ -256,7 +256,7 @@ func (i *PktID) DecodeFromBytes(raw []byte) {
 
 // SerializeTo serializes the PktID into the buffer (b).
 // @ requires  len(b) >= PktIDLen
-// @ preserves acc(i, R1)
+// @ preserves acc(i, R10)
 // @ preserves sl.Bytes(b, 0, len(b))
 // @ decreases
 func (i *PktID) SerializeTo(b []byte) {

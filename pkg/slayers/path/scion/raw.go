@@ -63,7 +63,7 @@ func (s *Raw) DecodeFromBytes(data []byte) (res error) {
 
 // SerializeTo writes the path to a slice. The slice must be big enough to hold the entire data,
 // otherwise an error is returned.
-// @ preserves acc(s.Mem(ubuf), R1)
+// @ preserves acc(s.Mem(ubuf), R10)
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves sl.Bytes(b, 0, len(b))
 // @ ensures   r != nil ==> r.ErrorMem()
@@ -75,10 +75,10 @@ func (s *Raw) SerializeTo(b []byte /*@, ghost ubuf []byte @*/) (r error) {
 	if minLen := s.Len( /*@ ubuf @*/ ); len(b) < minLen {
 		return serrors.New("buffer too small", "expected", minLen, "actual", len(b))
 	}
-	//@ unfold acc(s.Mem(ubuf), R1)
+	//@ unfold acc(s.Mem(ubuf), R10)
 	// XXX(roosd): This modifies the underlying buffer. Consider writing to data
 	// directly.
-	//@ unfold acc(s.Base.Mem(), R1)
+	//@ unfold acc(s.Base.Mem(), R10)
 	//@ sl.SplitRange_Bytes(ubuf, 0, len(s.Raw), writePerm)
 	//@ assert sl.Bytes(s.Raw, 0, len(s.Raw))
 	//@ sl.SplitRange_Bytes(s.Raw, 0, MetaLen, writePerm)
@@ -89,15 +89,15 @@ func (s *Raw) SerializeTo(b []byte /*@, ghost ubuf []byte @*/) (r error) {
 		// @ Unreachable()
 		return err
 	}
-	//@ fold acc(s.Base.Mem(), R1)
+	//@ fold acc(s.Base.Mem(), R10)
 	//@ sl.CombineRange_Bytes(s.Raw, 0, MetaLen, writePerm)
-	//@ unfold acc(sl.Bytes(s.Raw, 0, len(s.Raw)), R2)
+	//@ unfold acc(sl.Bytes(s.Raw, 0, len(s.Raw)), R12)
 	//@ unfold sl.Bytes(b, 0, len(b))
-	copy(b, s.Raw /*@ , R2 @*/)
+	copy(b, s.Raw /*@ , R12 @*/)
 	//@ fold sl.Bytes(b, 0, len(b))
-	//@ fold acc(sl.Bytes(s.Raw, 0, len(s.Raw)), R2)
+	//@ fold acc(sl.Bytes(s.Raw, 0, len(s.Raw)), R12)
 	//@ sl.CombineRange_Bytes(ubuf, 0, len(s.Raw), writePerm)
-	//@ fold acc(s.Mem(ubuf), R1)
+	//@ fold acc(s.Mem(ubuf), R10)
 	return nil
 }
 

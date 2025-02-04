@@ -34,12 +34,16 @@
 // |                                                               |
 // +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
+// +gobra
+
 package slayers
 
 import (
 	"encoding/binary"
 
 	"github.com/scionproto/scion/pkg/private/serrors"
+	// @ . "github.com/scionproto/scion/verification/utils/definitions"
+	//@ sl "github.com/scionproto/scion/verification/utils/slices"
 )
 
 const (
@@ -66,6 +70,7 @@ const (
 // range [1, 2^21-1].
 type PacketAuthSPI uint32
 
+// @ decreases
 func (p PacketAuthSPI) Type() uint8 {
 	if p&(1<<17) == 0 {
 		return PacketAuthASHost
@@ -73,6 +78,7 @@ func (p PacketAuthSPI) Type() uint8 {
 	return PacketAuthHostHost
 }
 
+// @ decreases
 func (p PacketAuthSPI) Direction() uint8 {
 	if p&(1<<16) == 0 {
 		return PacketAuthSenderSide
@@ -80,14 +86,18 @@ func (p PacketAuthSPI) Direction() uint8 {
 	return PacketAuthReceiverSide
 }
 
+// @ decreases
 func (p PacketAuthSPI) DRKeyProto() uint16 {
 	return uint16(p)
 }
 
+// @ decreases
 func (p PacketAuthSPI) IsDRKey() bool {
 	return p > 0 && p < (1<<21)
 }
 
+// @ trusted
+// @ requires false
 func MakePacketAuthSPIDRKey(
 	proto uint16,
 	drkeyType uint8,
@@ -135,6 +145,8 @@ type PacketAuthOption struct {
 
 // NewPacketAuthOption creates a new EndToEndOption of
 // OptTypeAuthenticator, initialized with the given SPAO data.
+// @ trusted
+// @ requires false
 func NewPacketAuthOption(
 	p PacketAuthOptionParams,
 ) (PacketAuthOption, error) {
@@ -149,6 +161,8 @@ func NewPacketAuthOption(
 // sequence number are set.
 // Checking the size and content of the Authenticator data must be done by the
 // caller.
+// @ trusted
+// @ requires false
 func ParsePacketAuthOption(o *EndToEndOption) (PacketAuthOption, error) {
 	if o.OptType != OptTypeAuthenticator {
 		return PacketAuthOption{},
@@ -163,6 +177,8 @@ func ParsePacketAuthOption(o *EndToEndOption) (PacketAuthOption, error) {
 
 // Reset reinitializes the underlying EndToEndOption with the SPAO data.
 // Reuses the OptData buffer if it is of sufficient capacity.
+// @ trusted
+// @ requires false
 func (o PacketAuthOption) Reset(
 	p PacketAuthOptionParams,
 ) error {
@@ -193,32 +209,64 @@ func (o PacketAuthOption) Reset(
 }
 
 // SPI returns the value set in the Security Parameter Index in the extension.
+// @ preserves acc(o.EndToEndOption, R50)
+// @ preserves len(o.OptData) >= 4
+// @ preserves acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+// @ decreases
 func (o PacketAuthOption) SPI() PacketAuthSPI {
+	// @ unfold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+	// @ defer fold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+	// @ assert &o.OptData[:4][0] == &o.OptData[0] && &o.OptData[:4][1] == &o.OptData[1]
+	// @ assert &o.OptData[:4][2] == &o.OptData[2] && &o.OptData[:4][3] == &o.OptData[3]
 	return PacketAuthSPI(binary.BigEndian.Uint32(o.OptData[:4]))
 }
 
 // Algorithm returns the algorithm type stored in the data buffer.
+// @ preserves acc(o.EndToEndOption, R50)
+// @ preserves len(o.OptData) >= 5
+// @ preserves acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+// @ decreases
 func (o PacketAuthOption) Algorithm() PacketAuthAlg {
+	// @ unfold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+	// @ defer fold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
 	return PacketAuthAlg(o.OptData[4])
 }
 
 // Timestamp returns the value set in the homonym field in the extension.
+// @ preserves acc(o.EndToEndOption, R50)
+// @ preserves len(o.OptData) >= 12
+// @ preserves acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+// @ decreases
 func (o PacketAuthOption) TimestampSN() uint64 {
+	// @ unfold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+	// @ defer fold acc(sl.Bytes(o.OptData, 0, len(o.OptData)), R50)
+	// @ assert &o.OptData[6:12][0] == &o.OptData[6 + 0] && &o.OptData[6:12][1] == &o.OptData[6 + 1]
+	// @ assert &o.OptData[6:12][2] == &o.OptData[6 + 2] && &o.OptData[6:12][3] == &o.OptData[6 + 3]
+	// @ assert &o.OptData[6:12][4] == &o.OptData[6 + 4] && &o.OptData[6:12][5] == &o.OptData[6 + 5]
 	return bigEndianUint48(o.OptData[6:12])
 }
 
 // Authenticator returns slice of the underlying auth buffer.
 // Changes to this slice will be reflected on the wire when
 // the extension is serialized.
+// @ trusted
+// @ requires false
 func (o PacketAuthOption) Authenticator() []byte {
 	return o.OptData[12:]
 }
 
-func bigEndianUint48(b []byte) uint64 {
+// @ requires  len(b) >= 6
+// @ preserves acc(&b[0], R50) && acc(&b[1], R50) && acc(&b[2], R50) && acc(&b[3], R50) && acc(&b[4], R50) && acc(&b[5], R50)
+// @ decreases
+func bigEndianUint48(b []byte) (res uint64) {
+	// @ assert &b[2:6][0] == &b[2 + 0] && &b[2:6][1] == &b[2 + 1]
+	// @ assert &b[2:6][2] == &b[2 + 2] && &b[2:6][3] == &b[2 + 3]
 	return uint64(b[0])<<40 + uint64(b[1])<<32 +
 		uint64(binary.BigEndian.Uint32(b[2:6]))
 }
 
+// @ trusted
+// @ requires false
 func bigEndianPutUint48(b []byte, v uint64) {
 	b[0] = byte(v >> 40)
 	b[1] = byte(v >> 32)
