@@ -22,13 +22,13 @@ initEnsures LayerTypeSCION == 1000
 package slayers
 
 import (
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 
 	// the following comes from gopacket/layers instead of gopacket
 	importRequires gopacket.LayerTypesMem()
 	importRequires forall t gopacket.LayerType :: { gopacket.Registered(t) } 1000 <= t ==>
 		!gopacket.Registered(t)
-	"github.com/google/gopacket/layers"
+	"github.com/gopacket/gopacket/layers"
 )
 
 var (
