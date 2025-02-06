@@ -4,8 +4,6 @@
 // 	protoc        v3.21.10
 // source: proto/drkey/v1/drkey.proto
 
-// +gobra
-
 package drkey
 
 import (

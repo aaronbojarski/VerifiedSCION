@@ -3,13 +3,3 @@
 package protoreflect
 
 type EnumNumber int32
-
-
-type EnumDescriptor interface {
-}
-
-type EnumType interface {
-}
-
-type FileDescriptor interface {
-}
