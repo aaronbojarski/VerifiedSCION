@@ -89,6 +89,26 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+      - name: Verify package 'pkg/drkey'
+        uses: viperproject/gobra-action@main
+        with:
+          packages: 'pkg/drkey'
+          timeout: 5m
+          headerOnly: ${{ env.headerOnly }}
+          module: ${{ env.module }}
+          includePaths: ${{ env.includePaths }}
+          assumeInjectivityOnInhale: ${{ env.assumeInjectivityOnInhale }}
+          checkConsistency: ${{ env.checkConsistency }}
+          statsFile: '/stats/stats_drkey.json'
+          parallelizeBranches: ${{ env.parallelizeBranches }}
+          imageVersion: ${{ env.imageVersion }}
+          mceMode: ${{ env.mceMode }}
+          requireTriggers: ${{ env.requireTriggers }}
+          overflow: ${{ env.overflow }}
+          useZ3API: ${{ env.useZ3API }}
+          disableNL: ${{ env.disableNL }}
+          viperBackend: ${{ env.viperBackend }}
+          unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
       - name: Verify package 'pkg/experimental/epic'
         uses: viperproject/gobra-action@main
         with:

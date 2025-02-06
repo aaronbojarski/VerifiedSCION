@@ -1,0 +1,5 @@
+// +gobra
+
+package protoreflect
+
+type EnumNumber int32
