@@ -122,7 +122,8 @@ var file_proto_drkey_v1_drkey_proto_depIdxs = []int32{
 
 func init() { file_proto_drkey_v1_drkey_proto_init() }
 
-// @ decreases
+// @ trusted
+// @ requires false
 func file_proto_drkey_v1_drkey_proto_init() {
 	if File_proto_drkey_v1_drkey_proto != nil {
 		return
