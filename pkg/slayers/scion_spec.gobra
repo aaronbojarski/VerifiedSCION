@@ -274,8 +274,9 @@ func (s *SCION) ExtractAcc(ghost ub []byte) (start, end int) {
 }
 
 ghost
+pure
 decreases
-pure func (a AddrType) Has3Bits() (res bool) {
+func (a AddrType) Has3Bits() (res bool) {
 	return 0 <= a && a <= 7
 }
 
@@ -761,7 +762,7 @@ requires acc(&s.DstAddrType) &&
 	acc(&s.SrcAddrType)      &&
 	acc(&s.HdrLen)           &&
 	acc(&s.Path)
-requires s.DstAddrType.Has3Bits() && s.SrcAddrType.Has3Bits()
+requires s.DstAddrType.Has4Bits() && s.SrcAddrType.Has4Bits()
 requires 0 <= CmnHdrLen+s.AddrHdrLenSpecInternal() &&
 	CmnHdrLen+s.AddrHdrLenSpecInternal() <= s.HdrLen*LineLen &&
 	s.HdrLen*LineLen <= len(ub)
@@ -786,7 +787,7 @@ requires acc(&s.DstAddrType) &&
 	acc(&s.SrcAddrType)      &&
 	acc(&s.HdrLen)           &&
 	acc(&s.Path)
-requires s.DstAddrType.Has3Bits() && s.SrcAddrType.Has3Bits()
+requires s.DstAddrType.Has4Bits() && s.SrcAddrType.Has4Bits()
 requires 0 <= CmnHdrLen+s.AddrHdrLenSpecInternal() &&
 	CmnHdrLen+s.AddrHdrLenSpecInternal() <= s.HdrLen*LineLen &&
 	s.HdrLen*LineLen <= len(ub)
