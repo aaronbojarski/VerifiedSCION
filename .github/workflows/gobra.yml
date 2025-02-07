@@ -25,8 +25,9 @@ env:
   useZ3API: '0'
   viperBackend: 'SILICON'
   disableNL: '0'
-  unsafeWildcardOptimization: '1'
+  unsafeWildcardOptimization: '0'
   overflow: '0'
+  respectFunctionPrePermAmounts: '0'
 
 jobs:
   verify-deps:
@@ -69,6 +70,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/addr'
         uses: viperproject/gobra-action@main
         with:
@@ -89,6 +91,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/drkey'
         uses: viperproject/gobra-action@main
         with:
@@ -109,6 +112,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/experimental/epic'
         uses: viperproject/gobra-action@main
         with:
@@ -128,6 +132,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/log'
         uses: viperproject/gobra-action@main
         with:
@@ -147,6 +152,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/private/serrors'
         uses: viperproject/gobra-action@main
         with:
@@ -166,6 +172,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/scrypto'
         uses: viperproject/gobra-action@main
         with:
@@ -185,6 +192,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/slayers'
         uses: viperproject/gobra-action@main
         with:
@@ -204,6 +212,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/slayers/path'
         uses: viperproject/gobra-action@main
         with:
@@ -223,6 +232,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/slayers/path/empty'
         uses: viperproject/gobra-action@main
         with:
@@ -242,6 +252,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/slayers/path/epic'
         uses: viperproject/gobra-action@main
         with:
@@ -262,6 +273,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/slayers/path/onehop'
         uses: viperproject/gobra-action@main
         with:
@@ -281,6 +293,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/slayers/path/scion'
         uses: viperproject/gobra-action@main
         with:
@@ -300,6 +313,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'pkg/spao'
         uses: viperproject/gobra-action@main
         with:
@@ -319,6 +333,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'private/topology'
         uses: viperproject/gobra-action@main
         with:
@@ -338,6 +353,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'private/topology/underlay'
         uses: viperproject/gobra-action@main
         with:
@@ -357,6 +373,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'private/underlay/conn'
         uses: viperproject/gobra-action@main
         with:
@@ -376,6 +393,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'private/underlay/sockctrl'
         uses: viperproject/gobra-action@main
         with:
@@ -395,6 +413,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'router/bfd'
         uses: viperproject/gobra-action@main
         with:
@@ -414,6 +433,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Verify package 'router/control'
         uses: viperproject/gobra-action@main
         with:
@@ -433,6 +453,7 @@ jobs:
           disableNL: ${{ env.disableNL }}
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: ${{ env.unsafeWildcardOptimization }}
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
       - name: Upload the verification report
         uses: actions/upload-artifact@v4
         with:
@@ -454,13 +475,7 @@ jobs:
           includePaths: ${{ env.includePaths }}
           assumeInjectivityOnInhale: ${{ env.assumeInjectivityOnInhale }}
           checkConsistency: ${{ env.checkConsistency }}
-          # Due to a bug introduced in https://github.com/viperproject/gobra/pull/776,
-          # we must currently disable the chopper, otherwise we well-founded orders
-          # for termination checking are not available at the chopped Viper parts.
-          # We should reenable it whenever possible, as it reduces verification time in
-          # ~8 min (20%).
-          # chop: 10
-          parallelizeBranches: '1'
+          parallelizeBranches: '0'
           conditionalizePermissions: '1'
           moreJoins: 'impure'
           imageVersion: ${{ env.imageVersion }}
@@ -471,3 +486,4 @@ jobs:
           disableNL: '0'
           viperBackend: ${{ env.viperBackend }}
           unsafeWildcardOptimization: '0'
+          respectFunctionPrePermAmounts: ${{ env.respectFunctionPrePermAmounts }}
