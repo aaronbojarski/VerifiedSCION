@@ -1,0 +1,10 @@
+
+// +gobra
+
+package sync
+
+import . "github.com/scionproto/scion/verification/utils/definitions"
+
+type Once struct {
+    privateFields PrivateField
+}
