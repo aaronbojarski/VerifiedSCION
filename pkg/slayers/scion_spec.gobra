@@ -548,8 +548,8 @@ requires CmnHdrLen <= length
 decreases
 pure func GetAddressOffsetWithinLength(ub []byte, length int) int {
 	return unfolding sl.Bytes(ub, 0, length)                  in
-		let dstAddrLen := AddrType(ub[9] >> 4 & 0x7).Length() in
-		let srcAddrLen := AddrType(ub[9] & 0x7).Length()      in
+		let dstAddrLen := AddrType(ub[9] >> 4 & 0xF).Length() in
+		let srcAddrLen := AddrType(ub[9] & 0xF).Length()      in
 		CmnHdrLen + 2*addr.IABytes + dstAddrLen + srcAddrLen
 }
 
