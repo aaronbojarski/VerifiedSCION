@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +gobra
+
 package spao
 
 import (
@@ -23,6 +25,7 @@ import (
 
 // RelativeTimestamp returns the relative timestamp (RelTime) as the time diference from
 // time instant t to the beginning of the drkey epoch.
+// @ decreases
 func RelativeTimestamp(e drkey.Epoch, t time.Time) (uint64, error) {
 	relTime := t.Sub(e.NotBefore).Nanoseconds()
 	if relTime >= (1 << 48) {
@@ -34,6 +37,7 @@ func RelativeTimestamp(e drkey.Epoch, t time.Time) (uint64, error) {
 // AbsoluteTimestamp returns the absolute timestamp (AbsTime) based on the
 // relTime (Timestamp / Sequence Number field in SPAO header) and the DRKey
 // information.
+// @ decreases
 func AbsoluteTimestamp(e drkey.Epoch, relTime uint64) time.Time {
 	return e.NotBefore.Add(time.Duration(relTime))
 }
