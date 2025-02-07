@@ -29,7 +29,7 @@ import (
 		!gopacket.Registered(t)
 	importRequires forall t gopacket.LayerType :: { gopacket.Registered(t) } 3 < t ==>
 		!gopacket.Registered(t)
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 )
 
 // This method just generates stubs for decoders so that we can avoid having to specify all 136 decoders

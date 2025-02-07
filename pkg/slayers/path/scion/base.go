@@ -177,6 +177,7 @@ func (s *Base) IncPath() (e error) {
 	}
 	if int(s.PathMeta.CurrHF) >= s.NumHops-1 {
 		s.PathMeta.CurrHF = uint8(s.NumHops - 1)
+		//@ defer fold s.NonInitMem()
 		return serrors.New("path already at end",
 			"curr_hf", s.PathMeta.CurrHF,
 			"num_hops", s.NumHops)
