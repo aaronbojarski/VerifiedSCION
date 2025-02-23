@@ -226,6 +226,13 @@ func serializeAuthenticatedData(
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
 			opt.SPI().Direction() == slayers.PacketAuthReceiverSide) {
+		// @ preserves acc(s.Mem(ubuf), R10)
+		// @ preserves len(buf) >= MACBufferSize && sl.Bytes(buf, 0, len(buf))
+		// @ preserves sl.Bytes(ubuf, 0, len(ubuf))
+		// @ ensures   unfolding acc(s.Mem(ubuf), R10) in offset == before(offset) + s.DstAddrType.Length()
+		// @ decreases
+		// @ outline (
+		// @ unfold acc(s.Mem(ubuf), R10)
 		// @ ghost dstAddrBytes := s.DstAddrType.Length()
 		// @ ghost ubufOffset := slayers.CmnHdrLen + 2 * addr.IABytes
 		// @ ghost copyOffset := offset
@@ -238,10 +245,19 @@ func serializeAuthenticatedData(
 		// @ fold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+dstAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+dstAddrBytes])), R10)
 		// @ sl.CombineRange_Bytes(buf, copyOffset, len(buf), writePerm)
 		// @ sl.CombineRange_Bytes(ubuf, ubufOffset, ubufOffset+dstAddrBytes, R10)
+		// @ fold acc(s.Mem(ubuf), R10)
+		// @ )
 	}
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
 			opt.SPI().Direction() == slayers.PacketAuthSenderSide) {
+		// @ preserves acc(s.Mem(ubuf), R10)
+		// @ preserves len(buf) >= MACBufferSize && sl.Bytes(buf, 0, len(buf))
+		// @ preserves sl.Bytes(ubuf, 0, len(ubuf))
+		// @ ensures   unfolding acc(s.Mem(ubuf), R10) in offset == before(offset) + s.SrcAddrType.Length()
+		// @ decreases
+		// @ outline (
+		// @ unfold acc(s.Mem(ubuf), R10)
 		// @ ghost srcAddrBytes := s.SrcAddrType.Length()
 		// @ ghost ubufOffset := slayers.CmnHdrLen + 2 * addr.IABytes + s.DstAddrType.Length()
 		// @ ghost copyOffset := offset
@@ -254,6 +270,8 @@ func serializeAuthenticatedData(
 		// @ fold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+srcAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+srcAddrBytes])), R10)
 		// @ sl.CombineRange_Bytes(buf, copyOffset, len(buf), writePerm)
 		// @ sl.CombineRange_Bytes(ubuf, ubufOffset, ubufOffset+srcAddrBytes, R10)
+		// @ fold acc(s.Mem(ubuf), R10)
+		// @ )
 	}
 	// @ fold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R10)
 
