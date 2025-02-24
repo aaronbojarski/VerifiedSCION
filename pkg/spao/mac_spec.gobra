@@ -17,9 +17,9 @@
 package spao
 
 ghost
-requires acc(m.ScionLayer.Mem(ubuf), _)
+requires  m.ScionLayer.Mem(ubuf)
 decreases
-pure func (m MACInput) Valid(ubuf []byte) bool {
+pure func (m MACInput) WeaklyValid(ubuf []byte) bool {
     return m.ScionLayer != nil && 
         m.ScionLayer.WeaklyValidPathMetaData(ubuf) 
 }

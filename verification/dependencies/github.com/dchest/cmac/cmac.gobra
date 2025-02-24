@@ -17,6 +17,8 @@ import (
 	sl "github.com/scionproto/scion/verification/utils/slices"
 )
 
+(*cmac) implements hash.Hash
+
 type cmac struct {
 	privateField def.PrivateField
 }
@@ -34,7 +36,9 @@ func New(c cipher.Block) (h hash.Hash, err error)
 
 preserves d.Mem() 
 preserves acc(p, 1/1000)
-ensures   err != nil ==> err.ErrorMem()
+ensures   0 <= n && n <= len(p)
+ensures   err == nil && n == len(p)
+ensures   d.Size() == old(d.Size()) + len(p)
 decreases
 func (d *cmac) Write(p []byte) (n int, err error)
 
@@ -49,3 +53,12 @@ requires acc(d.Mem(), _)
 ensures  res >= 0
 decreases
 pure func(d *cmac) Size() (res int)
+
+requires acc(d.Mem(), _)
+ensures  res >= 0
+decreases
+func(d *cmac) BlockSize() (res int)
+
+preserves d.Mem()
+decreases
+func(d *cmac) Reset()
