@@ -296,12 +296,7 @@ func serializeAuthenticatedData(
 // @ requires  orig != nil
 // @ requires  len(buf) >=  28 + 12 * scion.MaxHops + epic.MetadataLen
 // @ requires  acc(orig.Mem(ubuf), R9)
-// @ requires  (typeOf(orig) == type[*scion.Raw] ==>
-// @ 	orig.(*scion.Raw).GetBase(ubuf).WeaklyValid()) &&
-// @ 	(typeOf(orig) == type[*scion.Decoded] ==>
-// @ 	orig.(*scion.Decoded).GetBase(ubuf).WeaklyValid()) &&
-// @ 	(typeOf(orig) == type[*epic.Path] ==>
-// @ 	orig.(*epic.Path).GetBase(ubuf).WeaklyValid())
+// @ requires  slayers.WeaklyValidPath(orig, ubuf)
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ ensures   acc(orig.Mem(ubuf), R9)
