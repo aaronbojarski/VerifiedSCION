@@ -204,7 +204,7 @@ ghost
 requires s.Mem(ub)
 decreases
 pure func (s *SCION) WeaklyValidPathMetaData(ghost ub []byte) bool {
-	return unfolding acc(s.Mem(ub), _) in
+	return unfolding s.Mem(ub) in
 		let ubPath := s.UBPath(ub) in
 		WeaklyValidPath(s.Path, ubPath)
 }
