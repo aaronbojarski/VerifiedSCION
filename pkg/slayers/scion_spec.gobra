@@ -210,7 +210,7 @@ pure func (s *SCION) WeaklyValidPathMetaData(ghost ub []byte) bool {
 }
 
 ghost
-requires acc(s.Mem(ub), _)
+requires s.Mem(ub)
 decreases
 pure func (s *SCION) ValidPathMetaData(ghost ub []byte) bool {
 	return unfolding s.Mem(ub) in
