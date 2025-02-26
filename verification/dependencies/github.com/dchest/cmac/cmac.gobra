@@ -36,7 +36,6 @@ func New(c cipher.Block) (h hash.Hash, err error)
 
 preserves d.Mem() 
 preserves acc(p, 1/1000)
-ensures   0 <= n && n <= len(p)
 ensures   err == nil && n == len(p)
 ensures   d.Size() == old(d.Size()) + len(p)
 decreases
