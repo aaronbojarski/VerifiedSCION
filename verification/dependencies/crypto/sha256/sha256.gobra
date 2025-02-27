@@ -16,6 +16,7 @@ import "hash"
 // also implements [encoding.BinaryMarshaler] and
 // [encoding.BinaryUnmarshaler] to marshal and unmarshal the internal
 // state of the hash.
+trusted
 ensures   h != nil && h.Mem()
-decreases _
+decreases
 func New() (h hash.Hash)

@@ -75,7 +75,7 @@ type MACInput struct {
 // @ requires  len(auxBuffer) >= MACBufferSize
 // @ requires  len(outBuffer) >= aes.BlockSize
 // @ requires  acc(input.ScionLayer.Mem(ubuf), R8)
-// @ requires  input.Valid(ubuf)
+// @ requires  input.WeaklyValid(ubuf)
 // @ preserves acc(sl.Bytes(input.Key, 0, len(input.Key)), R50)
 // @ preserves acc(input.Header.EndToEndOption, R48)
 // @ preserves len(input.Header.OptData) >= 12
@@ -141,7 +141,7 @@ func initCMAC(key []byte) (m hash.Hash, retErr error) {
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves acc(s.Mem(ubuf), R8)
-// @ preserves s.ValidPathMetaData(ubuf)
+// @ preserves s.WeaklyValidPathMetaData(ubuf)
 // @ preserves acc(opt.EndToEndOption, R48)
 // @ preserves len(opt.OptData) >= 12
 // @ preserves acc(sl.Bytes(opt.OptData, 0, len(opt.OptData)), R49)
@@ -226,34 +226,58 @@ func serializeAuthenticatedData(
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
 			opt.SPI().Direction() == slayers.PacketAuthReceiverSide) {
-		// @ dstAddrBytes := s.DstAddrType.Length()
-		// @ ubufOffset := slayers.CmnHdrLen + 2 * addr.IABytes
-		// @ copyOffset := offset
+		// @ requires  0 <= offset && offset <= fixAuthDataInputLen + 16
+		// @ preserves acc(s.Mem(ubuf), R10)
+		// @ preserves len(buf) >= MACBufferSize && sl.Bytes(buf, 0, len(buf))
+		// @ preserves sl.Bytes(ubuf, 0, len(ubuf))
+		// @ ensures   unfolding acc(s.Mem(ubuf), R10) in offset == before(offset) + s.DstAddrType.Length()
+		// @ decreases
+		// @ outline (
+		// @ unfold acc(s.Mem(ubuf), R10)
+		// @ unfold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R15)
+		// @ ghost dstAddrBytes := s.DstAddrType.Length()
+		// @ ghost ubufOffset := slayers.CmnHdrLen + 2 * addr.IABytes
+		// @ ghost copyOffset := offset
 		// @ sl.SplitRange_Bytes(buf, copyOffset, len(buf), writePerm)
-		// @ sl.SplitRange_Bytes(ubuf, ubufOffset, ubufOffset+dstAddrBytes, R10)
+		// @ sl.SplitRange_Bytes(ubuf, ubufOffset, ubufOffset+dstAddrBytes, R15)
 		// @ unfold sl.Bytes(buf[copyOffset:], 0, len(buf[copyOffset:]))
-		// @ unfold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+dstAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+dstAddrBytes])), R10)
-		offset += copy(buf[offset:], s.RawDstAddr /*@ , R10 @*/)
+		// @ unfold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+dstAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+dstAddrBytes])), R15)
+		offset += copy(buf[offset:], s.RawDstAddr /*@ , R15 @*/)
 		// @ fold sl.Bytes(buf[copyOffset:], 0, len(buf[copyOffset:]))
-		// @ fold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+dstAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+dstAddrBytes])), R10)
+		// @ fold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+dstAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+dstAddrBytes])), R15)
 		// @ sl.CombineRange_Bytes(buf, copyOffset, len(buf), writePerm)
-		// @ sl.CombineRange_Bytes(ubuf, ubufOffset, ubufOffset+dstAddrBytes, R10)
+		// @ sl.CombineRange_Bytes(ubuf, ubufOffset, ubufOffset+dstAddrBytes, R15)
+		// @ fold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R15)
+		// @ fold acc(s.Mem(ubuf), R10)
+		// @ )
 	}
 	if !opt.SPI().IsDRKey() ||
 		(opt.SPI().Type() == slayers.PacketAuthASHost &&
 			opt.SPI().Direction() == slayers.PacketAuthSenderSide) {
-		// @ srcAddrBytes := s.SrcAddrType.Length()
-		// @ ubufOffset := slayers.CmnHdrLen + 2 * addr.IABytes + s.DstAddrType.Length()
-		// @ copyOffset := offset
+		// @ requires  0 <= offset && offset <= fixAuthDataInputLen + 32
+		// @ preserves acc(s.Mem(ubuf), R10)
+		// @ preserves len(buf) >= MACBufferSize && sl.Bytes(buf, 0, len(buf))
+		// @ preserves sl.Bytes(ubuf, 0, len(ubuf))
+		// @ ensures   unfolding acc(s.Mem(ubuf), R10) in offset == before(offset) + s.SrcAddrType.Length()
+		// @ decreases
+		// @ outline (
+		// @ unfold acc(s.Mem(ubuf), R10)
+		// @ unfold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R15)
+		// @ ghost srcAddrBytes := s.SrcAddrType.Length()
+		// @ ghost ubufOffset := slayers.CmnHdrLen + 2 * addr.IABytes + s.DstAddrType.Length()
+		// @ ghost copyOffset := offset
 		// @ sl.SplitRange_Bytes(buf, copyOffset, len(buf), writePerm)
-		// @ sl.SplitRange_Bytes(ubuf, ubufOffset, ubufOffset+srcAddrBytes, R10)
+		// @ sl.SplitRange_Bytes(ubuf, ubufOffset, ubufOffset+srcAddrBytes, R15)
 		// @ unfold sl.Bytes(buf[copyOffset:], 0, len(buf[copyOffset:]))
-		// @ unfold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+srcAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+srcAddrBytes])), R10)
-		offset += copy(buf[offset:], s.RawSrcAddr /*@ , R10 @*/)
+		// @ unfold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+srcAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+srcAddrBytes])), R15)
+		offset += copy(buf[offset:], s.RawSrcAddr /*@ , R15 @*/)
 		// @ fold sl.Bytes(buf[copyOffset:], 0, len(buf[copyOffset:]))
-		// @ fold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+srcAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+srcAddrBytes])), R10)
+		// @ fold acc(sl.Bytes(ubuf[ubufOffset:ubufOffset+srcAddrBytes], 0, len(ubuf[ubufOffset:ubufOffset+srcAddrBytes])), R15)
 		// @ sl.CombineRange_Bytes(buf, copyOffset, len(buf), writePerm)
-		// @ sl.CombineRange_Bytes(ubuf, ubufOffset, ubufOffset+srcAddrBytes, R10)
+		// @ sl.CombineRange_Bytes(ubuf, ubufOffset, ubufOffset+srcAddrBytes, R15)
+		// @ fold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R15)
+		// @ fold acc(s.Mem(ubuf), R10)
+		// @ )
 	}
 	// @ fold acc(s.HeaderMem(ubuf[slayers.CmnHdrLen:]), R10)
 
@@ -272,12 +296,7 @@ func serializeAuthenticatedData(
 // @ requires  orig != nil
 // @ requires  len(buf) >=  28 + 12 * scion.MaxHops + epic.MetadataLen
 // @ requires  acc(orig.Mem(ubuf), R9)
-// @ requires  (typeOf(orig) == type[*scion.Raw] ==>
-// @				orig.(*scion.Raw).GetBase(ubuf).WeaklyValid()) &&
-// @		   (typeOf(orig) == type[*scion.Decoded] ==>
-// @				orig.(*scion.Decoded).GetBase(ubuf).WeaklyValid()) &&
-// @		   (typeOf(orig) == type[*epic.Path] ==>
-// @				orig.(*epic.Path).GetBase(ubuf).WeaklyValid())
+// @ requires  slayers.WeaklyValidPath(orig, ubuf)
 // @ preserves sl.Bytes(buf, 0, len(buf))
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ ensures   acc(orig.Mem(ubuf), R9)
@@ -358,7 +377,7 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 		// @ fold sl.Bytes(buf, 0, len(buf))
 		offset += 8
 	}
-	// @ oldOffset := offset
+	// @ ghost oldOffset := offset
 	// @ invariant base.WeaklyValid()
 	// @ invariant 0 <= i && i <= base.NumINF
 	// @ invariant i == 0 ==> offset == oldOffset
@@ -368,7 +387,7 @@ func zeroOutWithBase(base scion.Base, buf []byte) {
 	// @ invariant sl.Bytes(buf, 0, len(buf))
 	// @ decreases base.NumINF - i
 	for i := 0; i < base.NumINF; i++ {
-		// @ oldOffsetInner := offset
+		// @ ghost oldOffsetInner := offset
 		// @ invariant base.WeaklyValid()
 		// @ invariant i < base.NumINF
 		// @ invariant 0 <= j && j <= int(base.PathMeta.SegLen[i])

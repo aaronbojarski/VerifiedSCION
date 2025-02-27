@@ -37,9 +37,8 @@ const (
 	SCMP    = Protocol(pb.Protocol_PROTOCOL_SCMP)
 )
 
-// TODO (VerifiedSCION): Changed this struct with embedded field to simple type definition.
 // Epoch represents a validity period.
-type Epoch cppki.Validity
+type Epoch = cppki.Validity
 
 // NewEpoch constructs an Epoch from its uint32 encoded begin and end parts.
 // @ decreases
