@@ -34,12 +34,13 @@ type FakeProvider struct {
 
 // @ requires  acc(p, R50)
 // @ requires  p.EpochDuration >= time.Second
+// @ ensures   err != nil ==> err.ErrorMem()
 // @ decreases
 func (p *FakeProvider) GetASHostKey(
 	validTime time.Time,
 	_ addr.IA,
 	_ addr.Host,
-) (drkey.ASHostKey, error) {
+) (k drkey.ASHostKey, err error) {
 
 	duration := int64(p.EpochDuration / time.Second)
 	idxCurrent := validTime.Unix() / duration
@@ -52,13 +53,14 @@ func (p *FakeProvider) GetASHostKey(
 
 // @ requires  acc(p, R45)
 // @ requires  p.EpochDuration >= time.Second
+// @ ensures   err != nil ==> err.ErrorMem()
 // @ decreases
 func (p *FakeProvider) GetKeyWithinAcceptanceWindow(
 	t time.Time,
 	timestamp uint64,
 	dstIA addr.IA,
 	dstAddr addr.Host,
-) (drkey.ASHostKey, error) {
+) (k drkey.ASHostKey, err error) {
 
 	keys, err := p.getASHostTriple(t, dstIA, dstAddr)
 	if err != nil {
@@ -92,6 +94,7 @@ func (p *FakeProvider) GetKeyWithinAcceptanceWindow(
 // @ requires  acc(p, R50)
 // @ requires  p.EpochDuration >= time.Second
 // @ ensures   acc(&k[0]) && acc(&k[1]) && acc(&k[2])
+// @ ensures   err != nil ==> err.ErrorMem()
 // @ decreases
 func (p *FakeProvider) getASHostTriple(
 	validTime time.Time,
