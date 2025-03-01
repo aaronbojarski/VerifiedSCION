@@ -32,5 +32,5 @@ decreases
 func TimeToSecs(time.Time) uint32
 
 ensures err != nil ==> err.ErrorMem()
-decreases _
+decreases
 func ParseDuration(durationStr string) (t time.Duration, err error)
