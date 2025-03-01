@@ -456,7 +456,7 @@ func (d *DataPlane) AddExternalInterface(ifID uint16, conn BatchConn,
 	if d.interfaces == nil {
 		d.interfaces = make(map[uint16]BatchConn)
 	}
-	if _, exists := d.external[ifID]; exists {
+	if _, existsB := d.external[ifID]; existsB {
 		return serrors.JoinNoStack(alreadySet, nil, "ifID", ifID)
 	}
 	d.interfaces[ifID] = conn
@@ -480,7 +480,7 @@ func (d *DataPlane) AddNeighborIA(ifID uint16, remote addr.IA) error {
 		// @ Unreachable()
 		return emptyValue
 	}
-	if _, exists := d.neighborIAs[ifID]; exists {
+	if _, existsB := d.neighborIAs[ifID]; existsB {
 		return serrors.JoinNoStack(alreadySet, nil, "ifID", ifID)
 	}
 	if d.neighborIAs == nil {
@@ -507,7 +507,7 @@ func (d *DataPlane) AddLinkType(ifID uint16, linkTo topology.LinkType) error {
 	if d.IsRunning() {
 		return modifyExisting
 	}
-	if _, exists := d.linkTypes[ifID]; exists {
+	if _, existsB := d.linkTypes[ifID]; existsB {
 		return serrors.JoinNoStack(alreadySet, nil, "ifID", ifID)
 	}
 	// @ fold acc(d.Mem(), OutMutexPerm)
@@ -531,7 +531,7 @@ func (d *DataPlane) AddRemotePeer(local, remote uint16) error {
 	if t, ok := d.linkTypes[local]; ok && t != topology.Peer {
 		return serrors.JoinNoStack(unsupportedPathType, nil, "type", t)
 	}
-	if _, exists := d.peerInterfaces[local]; exists {
+	if _, existsB := d.peerInterfaces[local]; existsB {
 		return serrors.JoinNoStack(alreadySet, nil, "local_interface", local)
 	}
 	if d.peerInterfaces == nil {
@@ -682,7 +682,7 @@ func (d *DataPlane) AddNextHop(ifID uint16, src, dst netip.AddrPort, cfg control
 	if d.internalNextHops == nil {
 		d.internalNextHops = make(map[uint16]netip.AddrPort)
 	}
-	if _, exists := d.internalNextHops[ifID]; exists {
+	if _, existsB := d.internalNextHops[ifID]; existsB {
 		return serrors.JoinNoStack(alreadySet, nil, "ifID", ifID)
 	}
 	d.internalNextHops[ifID] = dst
@@ -2845,6 +2845,7 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 			return serrors.JoinNoStack(cannotRoute, err,
 				"details", "incrementing path for SCMP")
 		}
+		// @ )
 	}
 	// @ TODO()
 
