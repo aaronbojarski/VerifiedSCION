@@ -125,7 +125,7 @@ func (s *Decoded) DecodeFromBytes(data []byte) (r error) {
 
 // SerializeTo writePerms the path to a slice. The slice must be big enough to hold the entire data,
 // otherwise an error is returned.
-// @ preserves acc(s.Mem(ubuf), R1)
+// @ preserves acc(s.Mem(ubuf), R10)
 // @ preserves sl.Bytes(ubuf, 0, len(ubuf))
 // @ preserves b !== ubuf ==> sl.Bytes(b, 0, len(b))
 // @ ensures   r != nil ==> r.ErrorMem()
@@ -135,18 +135,18 @@ func (s *Decoded) SerializeTo(b []byte /*@, ghost ubuf []byte @*/) (r error) {
 		return serrors.New("buffer too small to serialize path.", "expected", s.Len( /*@ ubuf @*/ ),
 			"actual", len(b))
 	}
-	//@ unfold acc(s.Mem(ubuf), R1)
+	//@ unfold acc(s.Mem(ubuf), R10)
 	//@ assert sl.Bytes(b, 0, len(b))
-	//@ unfold acc(s.Base.Mem(), R1)
+	//@ unfold acc(s.Base.Mem(), R10)
 	if err := s.PathMeta.SerializeTo(b); err != nil {
 		//@ Unreachable()
 		return err
 	}
-	//@ fold acc(s.Base.Mem(), R1)
-	//@ fold acc(s.Mem(ubuf), R1)
+	//@ fold acc(s.Base.Mem(), R10)
+	//@ fold acc(s.Mem(ubuf), R10)
 	offset := MetaLen
 
-	//@ invariant acc(s.Mem(ubuf), R1)
+	//@ invariant acc(s.Mem(ubuf), R10)
 	//@ invariant sl.Bytes(ubuf, 0, len(ubuf))
 	//@ invariant b !== ubuf ==> sl.Bytes(b, 0, len(b))
 	//@ invariant s.LenSpec(ubuf) <= len(b)
@@ -157,7 +157,7 @@ func (s *Decoded) SerializeTo(b []byte /*@, ghost ubuf []byte @*/) (r error) {
 	// (VerifiedSCION) TODO: reinstate the original range clause
 	// for _, info := range s.InfoFields {
 	for i := 0; i < /*@ unfolding acc(s.Mem(ubuf), _) in @*/ len(s.InfoFields); i++ {
-		//@ unfold acc(s.Mem(ubuf), R1)
+		//@ unfold acc(s.Mem(ubuf), R10)
 		info := &s.InfoFields[i]
 		//@ sl.SplitByIndex_Bytes(b, 0, len(b), offset, writePerm)
 		//@ sl.SplitByIndex_Bytes(b, offset, len(b), offset + path.InfoLen, writePerm)
@@ -170,10 +170,10 @@ func (s *Decoded) SerializeTo(b []byte /*@, ghost ubuf []byte @*/) (r error) {
 		//@ sl.Unslice_Bytes(b, offset, offset + path.InfoLen, writePerm)
 		//@ sl.CombineAtIndex_Bytes(b, offset, len(b), offset + path.InfoLen, writePerm)
 		//@ sl.CombineAtIndex_Bytes(b, 0, len(b), offset, writePerm)
-		//@ fold acc(s.Mem(ubuf), R1)
+		//@ fold acc(s.Mem(ubuf), R10)
 		offset += path.InfoLen
 	}
-	//@ invariant acc(s.Mem(ubuf), R1)
+	//@ invariant acc(s.Mem(ubuf), R10)
 	//@ invariant sl.Bytes(ubuf, 0, len(ubuf))
 	//@ invariant b !== ubuf ==> sl.Bytes(b, 0, len(b))
 	//@ invariant s.LenSpec(ubuf) <= len(b)
@@ -184,7 +184,7 @@ func (s *Decoded) SerializeTo(b []byte /*@, ghost ubuf []byte @*/) (r error) {
 	// (VerifiedSCION) TODO: reinstate the original range clause
 	// for _, hop := range s.HopFields {
 	for i := 0; i < /*@ unfolding acc(s.Mem(ubuf), _) in @*/ len(s.HopFields); i++ {
-		//@ unfold acc(s.Mem(ubuf), R1)
+		//@ unfold acc(s.Mem(ubuf), R10)
 		hop := &s.HopFields[i]
 		//@ sl.SplitByIndex_Bytes(b, 0, len(b), offset, writePerm)
 		//@ sl.SplitByIndex_Bytes(b, offset, len(b), offset + path.HopLen, writePerm)
@@ -196,7 +196,7 @@ func (s *Decoded) SerializeTo(b []byte /*@, ghost ubuf []byte @*/) (r error) {
 		//@ sl.Unslice_Bytes(b, offset, offset + path.HopLen, writePerm)
 		//@ sl.CombineAtIndex_Bytes(b, offset, len(b), offset + path.HopLen, writePerm)
 		//@ sl.CombineAtIndex_Bytes(b, 0, len(b), offset, writePerm)
-		//@ fold acc(s.Mem(ubuf), R1)
+		//@ fold acc(s.Mem(ubuf), R10)
 		offset += path.HopLen
 	}
 	return nil

@@ -189,6 +189,27 @@ pred (s *SCION) Mem(ubuf []byte) {
 }
 
 ghost
+requires acc(p.Mem(ubPath))
+decreases
+pure func WeaklyValidPath(p path.Path, ghost ubPath []byte) bool {
+	return (typeOf(p) == type[*scion.Raw] ==>
+ 		p.(*scion.Raw).GetBase(ubPath).WeaklyValid()) &&
+	 	(typeOf(p) == type[*scion.Decoded] ==>
+	 	p.(*scion.Decoded).GetBase(ubPath).WeaklyValid()) &&
+	 	(typeOf(p) == type[*epic.Path] ==>
+	 	p.(*epic.Path).GetBase(ubPath).WeaklyValid())
+}
+
+ghost
+requires s.Mem(ub)
+decreases
+pure func (s *SCION) WeaklyValidPathMetaData(ghost ub []byte) bool {
+	return unfolding s.Mem(ub) in
+		let ubPath := s.UBPath(ub) in
+		WeaklyValidPath(s.Path, ubPath)
+}
+
+ghost
 requires s.Mem(ub)
 decreases
 pure func (s *SCION) ValidPathMetaData(ghost ub []byte) bool {

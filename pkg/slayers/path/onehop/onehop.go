@@ -100,7 +100,7 @@ func (o *Path) DecodeFromBytes(data []byte) (r error) {
 	return r
 }
 
-// @ preserves acc(o.Mem(ubuf), R1)
+// @ preserves acc(o.Mem(ubuf), R10)
 // @ preserves acc(sl.Bytes(ubuf, 0, len(ubuf)), R1)
 // @ preserves sl.Bytes(b, 0, len(b))
 // @ ensures   (len(b) >= PathLen) == (err == nil)
@@ -113,7 +113,7 @@ func (o *Path) SerializeTo(b []byte /*@, ubuf []byte @*/) (err error) {
 			int(len(b)))
 	}
 	offset := 0
-	//@ unfold acc(o.Mem(ubuf), R1)
+	//@ unfold acc(o.Mem(ubuf), R10)
 	//@ sl.SplitRange_Bytes(b, 0, offset+path.InfoLen, writePerm)
 	if err := o.Info.SerializeTo(b[:offset+path.InfoLen]); err != nil {
 		//@ sl.CombineRange_Bytes(b, 0, offset+path.InfoLen, writePerm)
@@ -131,7 +131,7 @@ func (o *Path) SerializeTo(b []byte /*@, ubuf []byte @*/) (err error) {
 	//@ sl.SplitRange_Bytes(b, offset, offset+path.HopLen, writePerm)
 	err = o.SecondHop.SerializeTo(b[offset : offset+path.HopLen])
 	//@ sl.CombineRange_Bytes(b, offset, offset+path.HopLen, writePerm)
-	//@ fold acc(o.Mem(ubuf), R1)
+	//@ fold acc(o.Mem(ubuf), R10)
 	return err
 }
 
