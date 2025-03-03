@@ -1,0 +1,31 @@
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+/*
+Package unsafe contains operations that step around the type safety of Go programs.
+
+Packages that import unsafe may be non-portable and are not protected by the
+Go 1 compatibility guidelines.
+*/
+
+// +gobra
+
+package unsafe
+
+type ArbitraryType int
+
+// Sizeof takes an expression x of any type and returns the size in bytes
+// of a hypothetical variable v as if v was declared via var v = x.
+// The size does not include any memory possibly referenced by x.
+// For instance, if x is a slice, Sizeof returns the size of the slice
+// descriptor, not the size of the memory referenced by the slice;
+// if x is an interface, Sizeof returns the size of the interface value itself,
+// not the size of the value stored in the interface.
+// For a struct, the size includes any padding introduced by field alignment.
+// The return value of Sizeof is a Go constant if the type of the argument x
+// does not have variable size.
+// (A type has variable size if it is a type parameter or if it is an array
+// or struct type with elements of variable size).
+decreases
+func Sizeof(x ArbitraryType) uintptr

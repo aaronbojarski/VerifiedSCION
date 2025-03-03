@@ -1,0 +1,33 @@
+// Copyright 2022 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// +gobra
+
+package atomic
+
+import "unsafe"
+
+// A Bool is an atomic boolean value.
+// The zero value is false.
+type Bool struct {
+	_ noCopy
+	v uint32
+}
+
+// Load atomically loads and returns the value stored in x.
+decreases
+func (x *Bool) Load() bool
+
+// Store atomically stores val into x.
+decreases
+func (x *Bool) Store(val bool)
+
+// noCopy may be added to structs which must not be copied
+// after the first use.
+//
+// See https://golang.org/issues/8005#issuecomment-190753527
+// for details.
+//
+// Note that it must not be embedded, due to the Lock and Unlock methods.
+type noCopy struct{}
