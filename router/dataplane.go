@@ -27,7 +27,6 @@
 // @ initEnsures unsupportedPathTypeNextHeader != nil && unsupportedPathTypeNextHeader.ErrorMem()
 // @ initEnsures noBFDSessionFound             != nil && noBFDSessionFound.ErrorMem()
 // @ initEnsures noBFDSessionConfigured        != nil && noBFDSessionConfigured.ErrorMem()
-// @ initEnsures errBFDDisabled                != nil && errBFDDisabled.ErrorMem()
 package router
 
 import (
