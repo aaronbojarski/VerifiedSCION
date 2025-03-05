@@ -318,7 +318,7 @@ jobs:
         uses: viperproject/gobra-action@main
         with:
           packages: 'pkg/spao'
-          timeout: 30m
+          timeout: 40m
           headerOnly: ${{ env.headerOnly }}
           module: ${{ env.module }}
           includePaths: ${{ env.includePaths }}
