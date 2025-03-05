@@ -62,10 +62,8 @@ func (s *services) DelSvc(svc addr.SVC, a netip.AddrPort) {
 	if index == -1 {
 		return
 	}
-	//@ fold acc(hiddenPerm(a), R10)
 	//@ assert 0 < len(addrs)
 	//@ unfold validMapValue(svc, addrs)
-	//@ unfold InjectiveMem(addrs[len(addrs)-1], len(addrs)-1)
 	addrs[index] = addrs[len(addrs)-1]
 	addrs[len(addrs)-1] = netip.AddrPort{}
 	s.m[svc] = addrs[:len(addrs)-1]

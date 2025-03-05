@@ -40,7 +40,7 @@ ghost const runningPerm perm = 1/2
 
 pred MutexInvariant(d *DataPlane) {
 	acc(&d.running, runningPerm) &&
-	(!d.running.Load() ==> acc(d.Mem(), MutexPerm))
+	(!d.running.ValueSpec() ==> acc(d.Mem(), MutexPerm))
 }
 
 pred (d *DataPlane) Mem() {
@@ -48,8 +48,6 @@ pred (d *DataPlane) Mem() {
 	acc(&d.external)                                              &&
 	acc(&d.linkTypes)                                             &&
 	acc(&d.neighborIAs)                                           &&
-	acc(&d.internal)                                              &&
-	acc(&d.internalIP)                                            &&
 	acc(&d.internalNextHops)                                      &&
 	acc(&d.svc)                                                   &&
 	acc(&d.macFactory)                                            &&
@@ -58,20 +56,11 @@ pred (d *DataPlane) Mem() {
 	acc(&d.running, 1/2)                                          &&
 	acc(&d.Metrics)                                               &&
 	acc(&d.forwardingMetrics)                                     &&
-	acc(&d.key)                                                   &&
 	(d.external    != nil       ==> accBatchConn(d.external))     &&
 	(d.linkTypes   != nil       ==> acc(d.linkTypes))             &&
 	(d.neighborIAs != nil       ==> acc(d.neighborIAs))           &&
-	(d.internal != nil          ==> d.internal.Mem())             &&
-	(d.internalIP != nil        ==> d.internalIP.Mem())           &&
 	(d.internalNextHops != nil  ==> accAddr(d.internalNextHops))  &&
 	(d.svc != nil               ==> d.svc.Mem())                  &&
-	(d.macFactory != nil        ==> (
-		acc(d.key)                                      &&
-		acc(sl.Bytes(*d.key, 0, len(*d.key)), _)        &&
-		len(*d.key) > 0                                 &&
-		scrypto.ValidKeyForHash(*d.key)                 &&
-		d.macFactory implements MacFactorySpec{d.key}))           &&
 	(d.bfdSessions != nil       ==> accBfdSession(d.bfdSessions)) &&
 	(d.Metrics != nil           ==> acc(d.Metrics.Mem(), _))      &&
 	// The following permissions are enough to call all methods needed in fields
