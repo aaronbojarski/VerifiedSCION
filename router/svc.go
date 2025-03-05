@@ -47,8 +47,6 @@ func (s *services) AddSvc(svc addr.SVC, a netip.AddrPort) {
 	//@ fold acc(validMapValue(svc, addrs), R10)
 	//@ unfold validMapValue(svc, addrs)
 	s.m[svc] = append( /*@ R10, @*/ addrs, a)
-	//@ ghost tmp := s.m[svc]
-	//@ fold InjectiveMem(tmp[len(tmp)-1], len(tmp)-1)
 	//@ fold validMapValue(svc, s.m[svc])
 	//@ fold internalLockInv!<s!>()
 	//@ fold acc(s.Mem(), R50)

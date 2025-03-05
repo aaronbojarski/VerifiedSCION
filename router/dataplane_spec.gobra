@@ -40,7 +40,7 @@ ghost const runningPerm perm = 1/2
 
 pred MutexInvariant(d *DataPlane) {
 	acc(&d.running, runningPerm) &&
-	(!d.running ==> acc(d.Mem(), MutexPerm))
+	(!d.running.Load() ==> acc(d.Mem(), MutexPerm))
 }
 
 pred (d *DataPlane) Mem() {
