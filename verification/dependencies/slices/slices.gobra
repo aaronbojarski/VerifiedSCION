@@ -8,7 +8,21 @@
 
 package slices
 
+import "net/netip"
+
 // Contains reports whether v is present in s.
-// func Contains[S ~[]E, E comparable](s S, v E) bool {
-//  	return Index(s, v) >= 0
-// }
+// NOTE: The actual implementation of this function uses general type parameters
+// that gobra currently does not support. As it is only used with netip.AddrPort in
+// this repo, this is the type for which we provide specification.
+trusted
+requires false
+func Contains(s []netip.AddrPort, v netip.AddrPort) bool
+
+// Index returns the index of the first occurrence of v in s,
+// or -1 if not present.
+// NOTE: The actual implementation of this function uses general type parameters
+// that gobra currently does not support. As it is only used with netip.AddrPort in
+// this repo, this is the type for which we provide specification.
+trusted
+requires false
+func Index(s []netip.AddrPort, v netip.AddrPort) int

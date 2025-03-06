@@ -20,6 +20,7 @@ import (
 	"errors"
 	"hash"
 	"net"
+	"net/netip"
 
 	"github.com/gopacket/gopacket"
 
@@ -40,7 +41,7 @@ ghost const runningPerm perm = 1/2
 
 pred MutexInvariant(d *DataPlane) {
 	acc(&d.running, runningPerm) &&
-	(!d.running.ValueSpec() ==> acc(d.Mem(), MutexPerm))
+	(!d.running ==> acc(d.Mem(), MutexPerm))
 }
 
 pred (d *DataPlane) Mem() {
@@ -55,11 +56,12 @@ pred (d *DataPlane) Mem() {
 	acc(&d.localIA)                                               &&
 	acc(&d.running, 1/2)                                          &&
 	acc(&d.Metrics)                                               &&
+	acc(&d.forwardingMetrics)                                     &&
 	acc(&d.key)                                                   &&
 	(d.external    != nil       ==> accBatchConn(d.external))     &&
 	(d.linkTypes   != nil       ==> acc(d.linkTypes))             &&
 	(d.neighborIAs != nil       ==> acc(d.neighborIAs))           &&
-	(d.internalNextHops != nil  ==> accAddr(d.internalNextHops))  &&
+	(d.internalNextHops != nil  ==> acc(d.internalNextHops))  	  &&
 	(d.svc != nil               ==> d.svc.Mem())                  &&
 	(d.macFactory != nil        ==> (
 		acc(d.key)                                      &&
@@ -72,6 +74,10 @@ pred (d *DataPlane) Mem() {
 	// The following permissions are enough to call all methods needed in fields
 	// of forwardingMetrics
 	(d.forwardingMetrics != nil ==> accForwardingMetrics(d.forwardingMetrics))
+}
+
+pred accAddr(addrs map[uint16]netip.AddrPort) {	
+	acc(addrs)
 }
 
 pred accBatchConn(batchConns map[uint16]BatchConn) {
@@ -92,27 +98,33 @@ pred accForwardingMetrics(metrics map[uint16]interfaceMetrics) {
 		acc(forwardingMetricsMem(metrics[id], id), _)
 }
 
-pred forwardingMetricsMem(v forwardingMetrics, ignoredForInjectivity uint16) {
-	v.InputBytesTotal.Mem()     &&
-	v.OutputBytesTotal.Mem()    &&
-	v.InputPacketsTotal.Mem()   &&
-	v.OutputPacketsTotal.Mem()  &&
-	v.DroppedPacketsTotal.Mem()
+pred forwardingMetricsMem(v interfaceMetrics, ignoredForInjectivity uint16) {
+	forall id sizeClass :: { v[id] } id in domain(v) ==> (
+		v[id].InputBytesTotal.Mem()      		&&
+		v[id].InputPacketsTotal.Mem()    		&&
+		v[id].DroppedPacketsInvalid.Mem()		&&
+		v[id].DroppedPacketsBusyProcessor.Mem() &&
+		v[id].DroppedPacketsBusyForwarder.Mem() &&
+		v[id].DroppedPacketsBusySlowPath.Mem() 	&&
+		v[id].ProcessedPackets.Mem())
 }
 
-pred forwardingMetricsNonInjectiveMem(v forwardingMetrics) {
-	v.InputBytesTotal.Mem()     &&
-	v.OutputBytesTotal.Mem()    &&
-	v.InputPacketsTotal.Mem()   &&
-	v.OutputPacketsTotal.Mem()  &&
-	v.DroppedPacketsTotal.Mem()
+pred forwardingMetricsNonInjectiveMem(v interfaceMetrics) {
+	forall id sizeClass :: { v[id] } id in domain(v) ==> (
+		v[id].InputBytesTotal.Mem()      		&&
+		v[id].InputPacketsTotal.Mem()    		&&
+		v[id].DroppedPacketsInvalid.Mem()		&&
+		v[id].DroppedPacketsBusyProcessor.Mem() &&
+		v[id].DroppedPacketsBusyForwarder.Mem() &&
+		v[id].DroppedPacketsBusySlowPath.Mem() 	&&
+		v[id].ProcessedPackets.Mem())
 }
 
 ghost
 requires  acc(forwardingMetricsNonInjectiveMem(v), _)
 ensures   acc(forwardingMetricsMem(v, id), _)
 decreases
-func liftForwardingMetricsNonInjectiveMem(v forwardingMetrics, id uint16) {
+func liftForwardingMetricsNonInjectiveMem(v interfaceMetrics, id uint16) {
 	unfold acc(forwardingMetricsNonInjectiveMem(v), _)
 	fold acc(forwardingMetricsMem(v, id), _)
 }
@@ -148,12 +160,6 @@ func MacFactorySpec(ghost key *[]byte) (res hash.Hash)
 pred hideLocalIA(p *addr.IA) {
 	acc(p)
 }
-
-pred (err scmpError) ErrorMem() {
-	err.Cause != nil ==> err.Cause.ErrorMem()
-}
-
-scmpError implements error
 
 type offsetPair struct {
 	start int
@@ -192,7 +198,7 @@ func (d *DataPlane) getForwardingMetrics() {
 ghost
 requires d.Mem()
 decreases
-pure func (d *DataPlane) getValForwardingMetrics() map[uint16]forwardingMetrics {
+pure func (d *DataPlane) getValForwardingMetrics() map[uint16]interfaceMetrics {
 	return unfolding d.Mem() in
 		d.forwardingMetrics
 }
@@ -427,25 +433,6 @@ type Unit struct{}
 ghost
 requires d.Mem()
 decreases
-pure func (d *DataPlane) IsRunning() bool {
-	return unfolding d.Mem() in
-		d.running
-}
-
-ghost
-opaque
-requires d.Mem()
-requires acc(&d.running)
-ensures  d.IsRunning() == d.running
-decreases
-pure func (d *DataPlane) isRunningEq() Unit {
-	return unfolding d.Mem() in
-		Unit{}
-}
-
-ghost
-requires d.Mem()
-decreases
 pure func (d *DataPlane) InternalConnIsSet() bool {
 	return unfolding d.Mem() in
 		d.internal != nil
@@ -525,34 +512,6 @@ pred writeMsgInv(writeMsgs underlayconn.Messages) {
 }
 /** end of definitions used internally for the proof of Run **/
 
-/** ErrorCell **/
-pred (s *scmpError) Mem() {
-	acc(s)
-}
-
-preserves s.Mem() && s.CanSet(e)
-ensures   s.Get() === e
-decreases
-func (s *scmpError) Set(e error) {
-	unfold s.Mem()
-	defer fold s.Mem()
-	newErr := e.(scmpError)
-	*s = newErr
-}
-
-ghost
-requires s.Mem()
-decreases
-pure func (s *scmpError) Get() error {
-	return unfolding s.Mem() in
-		*s
-}
-
-ghost
-decreases
-pure func (s *scmpError) CanSet(e error) bool {
-	return typeOf(e) == type[scmpError]
-}
 
 /** spec for newPacketProcessor **/
 

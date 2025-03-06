@@ -15,16 +15,13 @@ type Bool struct {
 	v uint32
 }
 
-decreases
-pure func (x *Bool) ValueSpec() (res bool)
-
 // Load atomically loads and returns the value stored in x.
-ensures   res == x.ValueSpec()
+requires  false
 decreases
 func (x *Bool) Load() (res bool)
 
 // Store atomically stores val into x.
-ensures   val == x.ValueSpec()
+requires  false
 decreases
 func (x *Bool) Store(val bool)
 

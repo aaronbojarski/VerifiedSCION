@@ -20,6 +20,7 @@ import (
 	"context"
 	"hash"
 	"net"
+	"net/netip"
 
 	"github.com/scionproto/scion/pkg/addr"
 	"github.com/scionproto/scion/pkg/slayers"
@@ -59,7 +60,7 @@ func foldDataPlaneMem() (d *DataPlane) {
 	fold accBatchConn(d.external)
 	d.linkTypes = make(map[uint16]topology.LinkType)
 	d.neighborIAs = make(map[uint16]addr.IA)
-	d.internalNextHops = make(map[uint16]*net.UDPAddr)
+	d.internalNextHops = make(map[uint16]netip.AddrPort)
 	fold accAddr(d.internalNextHops)
 	d.svc = newServices()
 	d.bfdSessions = make(map[uint16]bfdSession)
@@ -68,16 +69,6 @@ func foldDataPlaneMem() (d *DataPlane) {
 	fold accForwardingMetrics(d.forwardingMetrics)
 	fold d.Mem()
 	fold MutexInvariant(d)
-}
-
-requires MutexInvariant(d) && acc(d.Mem(), OutMutexPerm)
-requires !d.IsRunning()
-ensures  acc(&d.running)
-decreases
-func canModifyRunning(d *DataPlane) {
-	unfold MutexInvariant(d)
-	d.isRunningEq()
-	unfold d.Mem()
 }
 
 requires macFactory != nil                        &&
@@ -133,7 +124,7 @@ func testRun(
 	d.Metrics = metrics
 	d.bfdSessions = make(map[uint16]bfdSession)
 	fold accBfdSession(d.bfdSessions)
-	d.forwardingMetrics = make(map[uint16]forwardingMetrics)
+	d.forwardingMetrics = make(map[uint16]interfaceMetrics)
 	fold accForwardingMetrics(d.forwardingMetrics)
 
 	ensures dp.Valid()
@@ -220,7 +211,6 @@ func testRun(
 	assert reveal d.PreWellConfigured()
 	fold MutexInvariant!< d !>()
 	// end of foldDataPlaneMem
-	assert !d.IsRunning()
 	assert d.InternalConnIsSet()
 	assert d.KeyIsSet()
 	assert d.SvcsAreSet()

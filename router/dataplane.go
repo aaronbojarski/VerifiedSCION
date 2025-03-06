@@ -126,9 +126,60 @@ type bfdSession interface {
 // (VerifiedSCION) the spec of this interface matches that of the methods
 // with the same name in private/underlay/conn/Conn.
 type BatchConn interface {
-	ReadBatch(underlayconn.Messages) (int, error)
-	WriteBatch(msgs underlayconn.Messages, flags int) (int, error)
-	Close() error
+	// @ pred Mem()
+
+	// @ requires  acc(Mem(), _)
+	// @ requires  forall i int :: { &msgs[i] } 0 <= i && i < len(msgs) ==>
+	// @ 	msgs[i].Mem()
+	// @ requires forall j int :: { &msgs[j] } 0 <= j && j < len(msgs) ==>
+	// @ 	sl.Bytes(msgs[j].GetFstBuffer(), 0, len(msgs[j].GetFstBuffer()))
+	// @ ensures   forall i int :: { &msgs[i] } 0 <= i && i < len(msgs) ==>
+	// @ 	(msgs[i].Mem() && msgs[i].HasActiveAddr())
+	// @ ensures   err == nil ==> 0 <= n && n <= len(msgs)
+	// @ ensures   err == nil ==>
+	// @ 	forall i int :: { &msgs[i] } 0 <= i && i < n ==> (
+	// @ 		typeOf(msgs[i].GetAddr()) == type[*net.UDPAddr] &&
+	// @ 		!msgs[i].HasWildcardPermAddr())
+	// @ ensures   err == nil ==>
+	// @ 	forall i int :: { &msgs[i] } 0 <= i && i < n ==> msgs[i].GetN() <= len(msgs[i].GetFstBuffer())
+	// @ ensures forall j int :: { &msgs[j] } 0 <= j && j < len(msgs) ==>
+	// @ 	sl.Bytes(msgs[j].GetFstBuffer(), 0, len(msgs[j].GetFstBuffer()))
+	// @ ensures   err != nil ==> err.ErrorMem()
+	// contracts for IO-spec
+	// @ requires  Prophecy(prophecyM)
+	// @ requires  io.token(place) && MultiReadBio(place, prophecyM)
+	// @ ensures   err != nil ==> prophecyM == 0
+	// @ ensures   err == nil ==> prophecyM == n
+	// @ ensures   io.token(old(MultiReadBioNext(place, prophecyM)))
+	// @ ensures   old(MultiReadBioCorrectIfs(place, prophecyM, path.ifsToIO_ifs(ingressID)))
+	// @ ensures   err == nil ==>
+	// @ 	forall i int :: { &msgs[i] } 0 <= i && i < n ==>
+	// @ 		MsgToAbsVal(&msgs[i], ingressID) == old(MultiReadBioIO_val(place, n)[i])
+	ReadBatch(msgs underlayconn.Messages /*@, ghost ingressID uint16, ghost prophecyM int, ghost place io.Place @*/) (n int, err error)
+
+	// @ requires  acc(Mem(), _)
+	// (VerifiedSCION) opted for less reusable spec for WriteBatch for
+	// performance reasons.
+	// @ requires  len(msgs) == 1
+	// @ requires  acc(msgs[0].Mem(), R50) && msgs[0].HasActiveAddr()
+	// @ requires  acc(sl.Bytes(msgs[0].GetFstBuffer(), 0, len(msgs[0].GetFstBuffer())), R50)
+	// preconditions for IO-spec:
+	// @ requires  MsgToAbsVal(&msgs[0], egressID) == ioAbsPkts
+	// @ requires  io.token(place) && io.CBioIO_bio3s_send(place, ioAbsPkts)
+	// @ ensures   acc(msgs[0].Mem(), R50) && msgs[0].HasActiveAddr()
+	// @ ensures   acc(sl.Bytes(msgs[0].GetFstBuffer(), 0, len(msgs[0].GetFstBuffer())), R50)
+	// @ ensures   err == nil ==> 0 <= n && n <= len(msgs)
+	// @ ensures   err != nil ==> err.ErrorMem()
+	// postconditions for IO-spec:
+	// (VerifiedSCION) the permission to the protocol must always be returned,
+	// otherwise the router cannot continue after failing to send a packet.
+	// @ ensures   io.token(old(io.dp3s_iospec_bio3s_send_T(place, ioAbsPkts)))
+	WriteBatch(msgs underlayconn.Messages, flags int /*@, ghost egressID uint16, ghost place io.Place, ghost ioAbsPkts io.IO_val @*/) (n int, err error)
+
+	// @ requires Mem()
+	// @ ensures  err != nil ==> err.ErrorMem()
+	// @ decreases
+	Close() (err error)
 }
 
 type disposition int
@@ -323,13 +374,11 @@ func (d *DataPlane) Shutdown() {
 
 // SetIA sets the local IA for the dataplane.
 // @ requires  acc(d.Mem(), OutMutexPerm)
-// @ requires  !d.IsRunning()
 // @ requires  d.LocalIA().IsZero()
 // @ requires  !ia.IsZero()
 // @ preserves d.mtx.LockP()
 // @ preserves d.mtx.LockInv() == MutexInvariant!<d!>
 // @ ensures   acc(d.Mem(), OutMutexPerm)
-// @ ensures   !d.IsRunning()
 // @ ensures   e == nil
 // @ decreases 0 if sync.IgnoreBlockingForTermination()
 func (d *DataPlane) SetIA(ia addr.IA) (e error) {
@@ -353,14 +402,12 @@ func (d *DataPlane) SetIA(ia addr.IA) (e error) {
 // SetKey sets the key used for MAC verification. The key provided here should
 // already be derived as in scrypto.HFMacFactory.
 // @ requires  acc(d.Mem(), OutMutexPerm)
-// @ requires  !d.IsRunning()
 // @ requires  !d.KeyIsSet()
 // @ requires  len(key) > 0
 // @ requires  sl.Bytes(key, 0, len(key))
 // @ preserves d.mtx.LockP()
 // @ preserves d.mtx.LockInv() == MutexInvariant!<d!>
 // @ ensures   acc(d.Mem(), OutMutexPerm)
-// @ ensures   !d.IsRunning()
 // @ ensures   res == nil ==> d.KeyIsSet()
 // @ decreases 0 if sync.IgnoreBlockingForTermination()
 func (d *DataPlane) SetKey(key []byte) (res error) {
@@ -498,7 +545,6 @@ func (d *DataPlane) AddNeighborIA(ifID uint16, remote addr.IA) error {
 // the given ID is already set, this method will return an error. This can only
 // be called on a not yet running dataplane.
 // @ preserves acc(d.Mem(), OutMutexPerm)
-// @ preserves !d.IsRunning()
 // (VerifiedSCION) unlike all other setter methods, this does not lock d.mtx.
 // This was reported in https://github.com/scionproto/scion/issues/4282.
 // @ preserves MutexInvariant!<d!>()
@@ -514,7 +560,6 @@ func (d *DataPlane) AddLinkType(ifID uint16, linkTo topology.LinkType) error {
 	}
 	// @ fold acc(d.Mem(), OutMutexPerm)
 	// @ unfold MutexInvariant!<d!>()
-	// @ d.isRunningEq()
 	// @ unfold d.Mem()
 	// @ defer fold MutexInvariant!<d!>()
 	// @ defer fold d.Mem()
@@ -613,7 +658,6 @@ func (d *DataPlane) addBFDController(ifID uint16, s bfd.Sender, cfg control.BFD,
 func (d *DataPlane) AddSvc(svc addr.SVC, a netip.AddrPort) error {
 	d.mtx.Lock()
 	// @ unfold MutexInvariant!<d!>()
-	// @ d.isRunningEq()
 	defer d.mtx.Unlock()
 	if !a.IsValid() {
 		return emptyValue
