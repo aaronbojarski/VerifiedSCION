@@ -131,8 +131,7 @@ func liftForwardingMetricsNonInjectiveMem(v interfaceMetrics, id uint16) {
 
 pred (p *scionPacketProcessor) initMem() {
 	acc(&p.d)                                    &&
-	acc(&p.ingressID)                            &&
-	acc(&p.buffer)                               &&
+	acc(&p.pkt)									 &&
 	acc(&p.mac)                                  &&
 	acc(p.scionLayer.NonInitMem())               &&
 	p.scionLayer.PathPoolInitializedNonInitMem() &&
@@ -142,9 +141,10 @@ pred (p *scionPacketProcessor) initMem() {
 	acc(&p.path)                                 &&
 	acc(&p.hopField)                             &&
 	acc(&p.infoField)                            &&
-	acc(&p.segmentChange)                        &&
+	acc(&p.effectiveXover)                       &&
+	acc(&p.peering)                        		 &&	
 	acc(&p.cachedMac)                            &&
-	acc(&p.macBuffers)                           &&
+	acc(&p.macInputBuffer)                       &&
 	acc(&p.bfdLayer)
 }
 
@@ -201,14 +201,6 @@ decreases
 pure func (d *DataPlane) getValForwardingMetrics() map[uint16]interfaceMetrics {
 	return unfolding d.Mem() in
 		d.forwardingMetrics
-}
-
-ghost
-requires p.sInit()
-decreases
-pure func (p *scionPacketProcessor) getIngressID() uint16 {
-	return unfolding p.sInit() in
-		p.ingressID
 }
 
 ghost
@@ -360,14 +352,6 @@ func (d *DataPlane) getSvcMem() {
 }
 
 ghost
-requires acc(d.Mem(), _) && d.InternalConnIsSet()
-ensures  acc(&d.internal, _) && acc(d.internal.Mem(), _)
-decreases
-func (d *DataPlane) getInternalMem() {
-	unfold acc(d.Mem(), _)
-}
-
-ghost
 requires acc(d.Mem(), _)
 ensures  acc(&d.running, _)
 decreases
@@ -400,15 +384,6 @@ func (d *DataPlane) getBfdSessionsMem() {
 	unfold acc(d.Mem(), _)
 }
 
-ghost
-requires acc(d.Mem(), _)
-ensures  acc(&d.internal, _)
-ensures  d.internal != nil ==> acc(d.internal.Mem(), _)
-decreases
-func (d *DataPlane) getInternal() {
-	unfold acc(d.Mem(), _)
-}
-
 requires acc(d.Mem(), _)
 ensures  acc(&d.macFactory, _)
 decreases
@@ -433,28 +408,9 @@ type Unit struct{}
 ghost
 requires d.Mem()
 decreases
-pure func (d *DataPlane) InternalConnIsSet() bool {
-	return unfolding d.Mem() in
-		d.internal != nil
-}
-
-ghost
-requires d.Mem()
-decreases
 pure func (d *DataPlane) MetricsAreSet() bool {
 	return unfolding d.Mem() in
 		d.Metrics != nil
-}
-
-ghost
-opaque
-requires d.Mem()
-requires acc(&d.internal)
-ensures  d.InternalConnIsSet() == (d.internal != nil)
-decreases
-pure func (d *DataPlane) internalIsSetEq() Unit {
-	return unfolding d.Mem() in
-		Unit{}
 }
 
 ghost
@@ -518,9 +474,6 @@ pred writeMsgInv(writeMsgs underlayconn.Messages) {
 // initial state, established after allocating with newPacketProcessor.
 pred (s* scionPacketProcessor) sInit() {
 	acc(&s.d)                                    &&
-	acc(&s.ingressID)                            &&
-	acc(&s.buffer) && s.buffer != nil            &&
-	s.buffer.Mem()                               &&
 	acc(&s.mac) && s.mac != nil && s.mac.Mem()   &&
 	s.scionLayer.NonInitMem()                    &&
 	// The following is not necessary
@@ -531,13 +484,11 @@ pred (s* scionPacketProcessor) sInit() {
 	acc(&s.path)                                 &&
 	acc(&s.hopField)                             &&
 	acc(&s.infoField)                            &&
-	acc(&s.segmentChange)                        &&
+	acc(&s.effectiveXover)                       &&
+	acc(&s.peering)                        		 &&
 	acc(&s.cachedMac)                            &&
-	acc(&s.macBuffers)                           &&
-	sl.Bytes(s.macBuffers.scionInput, 0, len(s.macBuffers.scionInput)) &&
-	s.bfdLayer.NonInitMem()                      &&
-	acc(&s.srcAddr)                              &&
-	acc(&s.rawPkt)
+	acc(&s.macInputBuffer)                       &&
+	s.bfdLayer.NonInitMem()
 }
 
 // each ghost method on *scionPacketProcessor has, in the name, the state in which it
@@ -548,14 +499,6 @@ decreases
 pure func (s* scionPacketProcessor) sInitD() (res *DataPlane) {
 	return unfolding s.sInit() in
 		s.d
-}
-
-ghost
-requires s.sInit()
-decreases
-pure func (s* scionPacketProcessor) sInitRawPkt() (res []byte) {
-	return unfolding s.sInit() in
-		s.rawPkt
 }
 
 ghost
@@ -580,22 +523,6 @@ decreases
 pure func (s* scionPacketProcessor) sInitInfoField() (res path.InfoField) {
 	return unfolding s.sInit() in
 		s.infoField
-}
-
-ghost
-requires s.sInit()
-decreases
-pure func (s* scionPacketProcessor) sInitSegmentChange() (res bool) {
-	return unfolding s.sInit() in
-		s.segmentChange
-}
-
-ghost
-requires s.sInit()
-decreases
-pure func (s* scionPacketProcessor) sInitBufferUBuf() (res []byte) {
-	return unfolding s.sInit() in
-		s.buffer.UBuf()
 }
 
 /** end spec for newPacketProcessor **/
@@ -628,18 +555,6 @@ func ResetDecodingLayers(
 	if hasE2eLayer {
 		e2eLayer.DowngradePerm(ubE2eLayer)
 	}
-}
-
-pred (d *DataPlane) validResult(result processResult, addrAliasesPkt bool) {
-	acc(d.Mem(), _)    &&
-	// EgressID
-	(result.EgressID != 0 ==> result.EgressID in d.getDomForwardingMetrics()) &&
-	// OutConn
-	(result.OutConn != nil ==> acc(result.OutConn.Mem(), _)) &&
-	// OutAddr
-	(addrAliasesPkt  && result.OutAddr != nil ==> acc(result.OutAddr.Mem(), R15)) &&
-	(!addrAliasesPkt && result.OutAddr != nil ==> acc(result.OutAddr.Mem(), _))
-	// OutPkt moved out
 }
 
 ghost

@@ -65,7 +65,7 @@ func foldDataPlaneMem() (d *DataPlane) {
 	d.svc = newServices()
 	d.bfdSessions = make(map[uint16]bfdSession)
 	fold accBfdSession(d.bfdSessions)
-	d.forwardingMetrics = make(map[uint16]forwardingMetrics)
+	d.forwardingMetrics = make(map[uint16]interfaceMetrics)
 	fold accForwardingMetrics(d.forwardingMetrics)
 	fold d.Mem()
 	fold MutexInvariant(d)
@@ -110,12 +110,11 @@ func testRun(
 		uint16(3): 1000,
 	}
 
-	a1 := allocateUDPAddr()
-	d.internalNextHops = map[uint16]*net.UDPAddr{
+	a1 := allocateAddrPort()
+	d.internalNextHops = map[uint16]netip.AddrPort{
 		uint16(4): a1,
 	}
 
-	d.internal = allocateBatchConn()
 	fold accAddr(d.internalNextHops)
 	d.svc = newServices()
 	d.macFactory = macFactory
@@ -211,7 +210,6 @@ func testRun(
 	assert reveal d.PreWellConfigured()
 	fold MutexInvariant!< d !>()
 	// end of foldDataPlaneMem
-	assert d.InternalConnIsSet()
 	assert d.KeyIsSet()
 	assert d.SvcsAreSet()
 	assert d.MetricsAreSet()
@@ -229,8 +227,7 @@ func testRun(
 ensures b != nil && b.Mem()
 func allocateBatchConn() (b BatchConn)
 
-ensures u != nil && u.Mem()
-func allocateUDPAddr() (u *net.UDPAddr)
+func allocateAddrPort() (u netip.AddrPort)
 
 // the following trivial assertion makes sure that `==` matches
 // `===` for ghost structs

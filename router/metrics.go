@@ -333,13 +333,14 @@ func newTrafficMetrics(
 	c.DroppedPacketsBusySlowPath =
 		metrics.DroppedPacketsTotal.MustCurryWith(ifLabels).MustCurryWith(scLabels).With(reasonMap)
 
-	c.InputBytesTotal.Add(0)
-	c.InputPacketsTotal.Add(0)
-	c.DroppedPacketsInvalid.Add(0)
-	c.DroppedPacketsBusyProcessor.Add(0)
-	c.DroppedPacketsBusyForwarder.Add(0)
-	c.DroppedPacketsBusySlowPath.Add(0)
-	c.ProcessedPackets.Add(0)
+	// (VerifiedSCION): added the cast to float64 as gobra does not handle implicit cast to float64.
+	c.InputBytesTotal.Add(float64(0))
+	c.InputPacketsTotal.Add(float64(0))
+	c.DroppedPacketsInvalid.Add(float64(0))
+	c.DroppedPacketsBusyProcessor.Add(float64(0))
+	c.DroppedPacketsBusyForwarder.Add(float64(0))
+	c.DroppedPacketsBusySlowPath.Add(float64(0))
+	c.ProcessedPackets.Add(float64(0))
 	return c
 }
 
@@ -354,8 +355,10 @@ func newOutputMetrics(
 		metrics.OutputBytesTotal.MustCurryWith(ifLabels).MustCurryWith(scLabels).With(ttLabels)
 	om.OutputPacketsTotal =
 		metrics.OutputPacketsTotal.MustCurryWith(ifLabels).MustCurryWith(scLabels).With(ttLabels)
-	om.OutputBytesTotal.Add(0)
-	om.OutputPacketsTotal.Add(0)
+
+	// (VerifiedSCION): added the cast to float64 as gobra does not handle implicit cast to float64.
+	om.OutputBytesTotal.Add(float64(0))
+	om.OutputPacketsTotal.Add(float64(0))
 	return om
 }
 

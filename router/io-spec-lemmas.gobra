@@ -104,19 +104,6 @@ ghost
 opaque
 requires p.scionLayer.Mem(ub)
 requires acc(&p.d) && p.d.Mem()
-requires acc(&p.ingressID)
-decreases
-pure func (p *scionPacketProcessor) DstIsLocalIngressID(ub []byte) bool {
-	return (unfolding p.scionLayer.Mem(ub) in
-		(unfolding p.scionLayer.HeaderMem(ub[slayers.CmnHdrLen:]) in p.scionLayer.DstIA) == (unfolding p.d.Mem() in p.d.localIA)) ==>
-			p.ingressID != 0
-}
-
-ghost
-opaque
-requires p.scionLayer.Mem(ub)
-requires acc(&p.d) && p.d.Mem()
-requires acc(&p.ingressID)
 requires sl.Bytes(ub, 0, len(ub))
 requires slayers.ValidPktMetaHdr(ub)
 decreases
@@ -130,24 +117,19 @@ pure func (p *scionPacketProcessor) LastHopLen(ub []byte) bool {
 ghost
 requires acc(p.scionLayer.Mem(ub), R50)
 requires acc(&p.d, R55) && acc(p.d.Mem(), _)
-requires acc(&p.ingressID, R55)
 requires acc(sl.Bytes(ub, 0, len(ub)), R56)
 requires slayers.ValidPktMetaHdr(ub)
-requires p.DstIsLocalIngressID(ub)
 requires p.LastHopLen(ub)
 requires (unfolding acc(p.scionLayer.Mem(ub), R50) in
 	(unfolding acc(p.scionLayer.HeaderMem(ub[slayers.CmnHdrLen:]), R55) in
 	p.scionLayer.DstIA) == (unfolding acc(p.d.Mem(), _) in p.d.localIA))
 ensures  acc(p.scionLayer.Mem(ub), R50)
 ensures  acc(&p.d, R55) && acc(p.d.Mem(), _)
-ensures  acc(&p.ingressID, R55)
 ensures  acc(sl.Bytes(ub, 0, len(ub)), R56)
 ensures  slayers.ValidPktMetaHdr(ub)
-ensures  p.ingressID != 0
 ensures  len(absPkt(ub).CurrSeg.Future) == 1
 decreases
 func (p* scionPacketProcessor) LocalDstLemma(ub []byte) {
-	reveal p.DstIsLocalIngressID(ub)
 	reveal p.LastHopLen(ub)
 }
 
@@ -164,24 +146,21 @@ pure func (p* scionPacketProcessor) GetIsXoverSpec(ub []byte) bool {
 ghost
 opaque
 requires acc(&p.d) && p.d.Mem()
-requires acc(&p.ingressID)
 requires pkt.PathNotFullyTraversed()
 decreases
 pure func (p *scionPacketProcessor) NoBouncingPkt(pkt io.IO_pkt2) bool {
 	return let currseg := pkt.CurrSeg in
 		let OptEgressID := CurrSegIO_ifs(pkt, false) in
 		let egressID := path.IO_ifsToIfs(OptEgressID) in
-		((egressID in p.d.getDomExternal()) || p.ingressID != 0)
+		(egressID in p.d.getDomExternal())
 }
 
 ghost
 requires acc(&p.d, R55) && acc(p.d.Mem(), _)
-requires acc(&p.ingressID, R55)
 requires pkt.PathNotFullyTraversed()
 requires AbsEgressInterfaceConstraint(pkt, path.ifsToIO_ifs(egressID))
-requires (egressID in p.d.getDomExternal()) || p.ingressID != 0
+requires (egressID in p.d.getDomExternal())
 ensures  acc(&p.d, R55) && acc(p.d.Mem(), _)
-ensures  acc(&p.ingressID, R55)
 ensures  p.NoBouncingPkt(pkt)
 decreases
 func (p *scionPacketProcessor) EstablishNoBouncingPkt(pkt io.IO_pkt2, egressID uint16) {
@@ -191,14 +170,11 @@ func (p *scionPacketProcessor) EstablishNoBouncingPkt(pkt io.IO_pkt2, egressID u
 
 ghost
 requires acc(&p.d, R55) && acc(p.d.Mem(), _)
-requires acc(&p.ingressID, R55)
 requires pkt.PathNotFullyTraversed()
 requires AbsEgressInterfaceConstraint(pkt, path.ifsToIO_ifs(egressID))
 requires p.NoBouncingPkt(pkt)
 requires !(egressID in p.d.getDomExternal())
 ensures  acc(&p.d, R55) && acc(p.d.Mem(), _)
-ensures  acc(&p.ingressID, R55)
-ensures  p.ingressID != 0
 decreases
 func (p *scionPacketProcessor) IngressIDNotZeroLemma(pkt io.IO_pkt2, egressID uint16) {
 	reveal AbsEgressInterfaceConstraint(pkt, path.ifsToIO_ifs(egressID))

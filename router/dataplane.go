@@ -43,7 +43,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"unsafe"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
@@ -95,8 +94,10 @@ const (
 	e2eAuthHdrLen = 32
 
 	// Needed to compute required padding
-	ptrSize = unsafe.Sizeof(&struct{ int }{})
-	is32bit = 1 - (ptrSize-4)/4
+	// TODO(aaronbojarski): add back when unsafe.Sizeof is speced
+	//ptrSize = unsafe.Sizeof(&struct{ int }{})
+	//is32bit = 1 - (ptrSize-4)/4
+	is32bit = 0
 )
 
 // (VerifiedSCION) acc(Mem(), _) is enough to call every method, given that
@@ -237,8 +238,9 @@ type slowPathRequest struct {
 }
 
 // Make sure that the packet structure has the size we expect.
-const _ uintptr = 64 - unsafe.Sizeof(packet{}) // assert 64 >= sizeof(packet)
-const _ uintptr = unsafe.Sizeof(packet{}) - 64 // assert sizeof(packet) >= 64
+// TODO(aaronbojarski): uncomment this once we figured out how to spec unsafe.Sizeof
+// const _ uintptr = 64 - unsafe.Sizeof(packet{}) // assert 64 >= sizeof(packet)
+// const _ uintptr = unsafe.Sizeof(packet{}) - 64 // assert sizeof(packet) >= 64
 
 // initPacket configures the given blank packet (and returns it, for convenience).
 func (p *packet) init(buffer *[bufSize]byte) *packet {
@@ -1593,7 +1595,6 @@ func (p *scionPacketProcessor) parsePath() disposition {
 	// @ assert p.hopField.ToIO_HF() == tmpHopField.ToIO_HF()
 	// @ assert err == nil ==> reveal p.path.CorrectlyDecodedHf(ubPath, tmpHopField)
 	// @ assert err == nil ==> reveal p.path.CorrectlyDecodedHf(ubPath, p.hopField)
-	// @ fold p.d.validResult(processResult{}, false)
 	if err != nil {
 		// TODO(lukedirtwalker) parameter problem invalid path?
 		return errorDiscard("error", err)
