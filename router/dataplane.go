@@ -213,6 +213,9 @@ func (p *packet) reset() {
 // from multiple sockets, performs routing, and sends them to their destinations
 // (after updating the path, if that is needed).
 type DataPlane struct {
+	// (VerifiedSCION) This is stored in the dataplane in order to retain
+	// knowledge that macFactory will not fail.
+	// @ ghost key *[]byte
 	interfaces          map[uint16]BatchConn
 	external            map[uint16]BatchConn
 	linkTypes           map[uint16]topology.LinkType
