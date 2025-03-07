@@ -75,3 +75,6 @@ func (p AddrPort) IsValid() (res bool)
 
 decreases _
 func (p AddrPort) Addr() Addr
+
+decreases _
+func (p AddrPort) String() string

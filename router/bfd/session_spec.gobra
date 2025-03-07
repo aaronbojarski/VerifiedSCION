@@ -24,6 +24,13 @@ initEnsures AlreadyRunning != nil && AlreadyRunning.ErrorMem()
 package bfd
 
 import (
+	"context"
+	"sync"
+	"time"
+
+	"github.com/gopacket/gopacket/layers"
+
+	"github.com/scionproto/scion/pkg/log"
 	"github.com/scionproto/scion/pkg/private/serrors"
 )
 
@@ -34,3 +41,175 @@ ensures AlreadyRunning != nil && AlreadyRunning.ErrorMem()
 ensures isComparable(AlreadyRunning)
 decreases
 func EstablishAlreadyRunning()
+
+// Sender is used by a BFD session to send out BFD packets.
+type Sender interface {
+	Send(bfd *layers.BFD) error
+}
+
+// Session describes a BFD Version 1 (RFC 5880) Session. Only Asynchronous mode is supported.
+//
+// Calling Run will start internal timers and cause the Session to start sending out BFD packets.
+//
+// Diagnostic codes are not supported. The field will always be set to 0, and diagnostic codes
+// received from the remote will be ignored.
+//
+// The AdminDown state is not supported at the moment. Sessions will never send out packets with a
+// State of 0 (AdminDown).
+//
+// The Control Plane Independent bit is cleared.
+//
+// Authentication is not supported. The Authentication Present bit of BFD packets is cleared.
+//
+// Session does not support the BFD Echo function. Therefore, the Required Min Echo RX field is
+// always set to 0.
+type Session struct {
+	// Sender is used by the Session to send BFD messages to the other end of the point to point
+	// link.
+	//
+	// Sender must not be nil.
+	Sender Sender
+
+	// LocalDiscriminator is the local discriminator for this BFD session, used
+	// to uniquely identify it on the local system. It must be nonzero.
+	LocalDiscriminator layers.BFDDiscriminator
+
+	// RemoteDiscriminator is the remote discriminator for this BFD session, as chosen
+	// by the remote system. If the Session has been bootstrapped via an external
+	// mechanism, this should be non-zero. If it is zero, the Session will perform
+	// bootstrapping.
+	RemoteDiscriminator layers.BFDDiscriminator
+
+	remoteDiscriminatorMtx sync.Mutex
+	// remoteDiscriminator is the discriminator of the remote Session, as set
+	// by the creator of the session or learned via bootstrapping. It is a
+	// separate field from the exported remote discriminator to keep that
+	// value read-only.
+	remoteDiscriminator layers.BFDDiscriminator
+
+	// DesiredMinTxInterval is the desired interval between BFD Control Packets
+	// sent by the local system.
+	//
+	// The interval is relevant up to microsecond granularity; if the duration is not a whole
+	// number of microseconds, the duration is rounded down to the next microsecond duration.
+	//
+	// The microsecond value obtained this way must be at least 1 and at most 2^32 - 1 microseconds.
+	// Run will return an error if the interval falls outside this range.
+	//
+	// Note that this is only a recommendation, as the BFD state machine might choose to use
+	// a different interval depending on network conditions (for example, an interval of 1 second if
+	// the local session is down).
+	DesiredMinTxInterval time.Duration
+
+	// RequiredMinRxInterval is the minimum interval between BFD Control Packets supported by the
+	// local system.
+	//
+	// The interval is relevant up to microsecond granularity; if the duration is not a whole number
+	// of microseconds, the duration is rounded down to the next microsecond duration.
+	//
+	// The microsecond value obtained this way must be at least 1 and at most 2^32 - 1 microseconds.
+	// Run will return an error if the interval falls outside this range.
+	//
+	// TEMPORARY API: The BFD RFC allows for this value to be 0, which means the system does not
+	// want to receive any periodic BFD control packets (see section 6.8.1). This behavior is not
+	// supported at the moment, and is subject to change.
+	RequiredMinRxInterval time.Duration
+
+	// DetectMult is the desired Detection Time multiplier for BFD Control packets on the local
+	// system. The negotiated Control packet transmission interval, multiplied by this variable,
+	// will be the Detection Time for this session (as seen by the remote system). This value
+	// must be non-zero.
+	DetectMult layers.BFDDetectMultiplier
+
+	// ReceiveQueueSize is the size of the Session's receive messages queue. The default is 0,
+	// but this is often not desirable as writing to the Session's message queue will block
+	// until the session is ready to read it.
+	ReceiveQueueSize int
+
+	messagesOnce sync.Once
+	// messages is the channel on which the session receives BFD packets.
+	messages chan bfdMessage
+
+	// localStateLock protects access to the local state.
+	localStateLock sync.RWMutex
+	// localState is the state of the local BFD session.
+	localState state
+
+	runMarkerLock sync.Mutex
+	// runMarker is set to true the first time a Session runs. Subsequent calls use this value to
+	// return an error.
+	runMarker bool
+
+	// desiredMinTXInterval is the desired transmission value included in sent packets. This
+	// alternates, based on session state, between the default transmission interval and the
+	// value explicitly configured in the public field.
+	desiredMinTXInterval time.Duration
+
+	// remoteState is the state of the remote BFD session, as reported by the last
+	// seen periodic BFD control message.
+	remoteState state
+
+	// remoteMinRxInterval is the last value of Required Min RX interval received from the
+	// remote system in a BFD Control packet.
+	remoteMinRxInterval time.Duration
+
+	// Metrics is used by the session to report information about internal operation.
+	//
+	// If a metric is not initialized, it is not reported.
+	Metrics Metrics
+
+	// testLogger is set if more logs should be generated, specifically, logs about
+	// periodic events that would in production environment clog the logs. Use
+	// this field only in tests.
+	testLogger log.Logger
+}
+
+trusted
+requires false
+func (s *Session) IsUp() bool
+
+trusted
+requires false
+func (s *Session) Run(ctx context.Context) error
+
+trusted
+requires false
+func (s *Session) ReceiveMessage(msg *layers.BFD, ghost ub []byte)
+
+// bfdMessage contains the relevant values to (asynchronously) process a BFD message
+// received from the network. This is a subset of the fields of layers.BFD.
+type bfdMessage struct {
+	State                 layers.BFDState
+	DetectMultiplier      layers.BFDDetectMultiplier
+	MyDiscriminator       layers.BFDDiscriminator
+	YourDiscriminator     layers.BFDDiscriminator
+	DesiredMinTxInterval  layers.BFDTimeInterval
+	RequiredMinRxInterval layers.BFDTimeInterval
+}
+
+// state describes a BFD state machine state.
+//
+// The state machine is defined in RFC 5880 as:
+//
+//	                          +--+
+//	                          |  | UP, ADMIN DOWN, TIMER
+//	                          |  V
+//	                  DOWN  +------+  INIT
+//	           +------------|      |------------+
+//	           |            | DOWN |            |
+//	           |  +-------->|      |<--------+  |
+//	           |  |         +------+         |  |
+//	           |  |                          |  |
+//	           |  |               ADMIN DOWN,|  |
+//	           |  |ADMIN DOWN,          DOWN,|  |
+//	           |  |TIMER                TIMER|  |
+//	           V  |                          |  V
+//	         +------+                      +------+
+//	    +----|      |                      |      |----+
+//	DOWN|    | INIT |--------------------->|  UP  |    |INIT, UP
+//	    +--->|      | INIT, UP             |      |<---+
+//	         +------+                      +------+
+//
+// This package implements the full-state machine, including a separate
+// state for Admin Down.
+type state layers.BFDState

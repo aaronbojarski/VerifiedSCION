@@ -25,6 +25,9 @@ preserves forall i int :: { &v[i] } 0 <= i && i < len(v) ==> acc(&v[i], R55)
 decreases _
 func Sprintf(format string, v ...interface{}) string
 
+decreases _
+func Sprint(a ...any) string
+
 type Stringer interface {
 	pred Mem()
 

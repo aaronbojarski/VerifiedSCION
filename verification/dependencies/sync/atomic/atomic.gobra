@@ -33,3 +33,9 @@ func (x *Bool) Store(val bool)
 //
 // Note that it must not be embedded, due to the Lock and Unlock methods.
 type noCopy struct{}
+
+// An Int32 is an atomic int32. The zero value is zero.
+type Int32 struct {
+	_ noCopy
+	v int32
+}

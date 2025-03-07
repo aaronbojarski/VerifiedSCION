@@ -24,7 +24,7 @@ import (
 
 // BFD is the configuration for a BFD session
 type BFD struct {
-	Disable               bool
+	Disable               *bool
 	DetectMult            uint8
 	DesiredMinTxInterval  time.Duration
 	RequiredMinRxInterval time.Duration

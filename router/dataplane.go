@@ -165,8 +165,8 @@ type BatchConn interface {
 	// @ requires  acc(msgs[0].Mem(), R50) && msgs[0].HasActiveAddr()
 	// @ requires  acc(sl.Bytes(msgs[0].GetFstBuffer(), 0, len(msgs[0].GetFstBuffer())), R50)
 	// preconditions for IO-spec:
-	// @ requires  MsgToAbsVal(&msgs[0], egressID) == ioAbsPkts
-	// @ requires  io.token(place) && io.CBioIO_bio3s_send(place, ioAbsPkts)
+	// requires  MsgToAbsVal(&msgs[0], egressID) == ioAbsPkts
+	// requires  io.token(place) && io.CBioIO_bio3s_send(place, ioAbsPkts)
 	// @ ensures   acc(msgs[0].Mem(), R50) && msgs[0].HasActiveAddr()
 	// @ ensures   acc(sl.Bytes(msgs[0].GetFstBuffer(), 0, len(msgs[0].GetFstBuffer())), R50)
 	// @ ensures   err == nil ==> 0 <= n && n <= len(msgs)
@@ -174,8 +174,9 @@ type BatchConn interface {
 	// postconditions for IO-spec:
 	// (VerifiedSCION) the permission to the protocol must always be returned,
 	// otherwise the router cannot continue after failing to send a packet.
-	// @ ensures   io.token(old(io.dp3s_iospec_bio3s_send_T(place, ioAbsPkts)))
-	WriteBatch(msgs underlayconn.Messages, flags int /*@, ghost egressID uint16, ghost place io.Place, ghost ioAbsPkts io.IO_val @*/) (n int, err error)
+	// ensures   io.token(old(io.dp3s_iospec_bio3s_send_T(place, ioAbsPkts)))
+	// TODO(aaronbojarski): add ghost parameters again once actually verifying the function.
+	WriteBatch(msgs underlayconn.Messages, flags int /*, ghost egressID uint16, ghost place io.Place, ghost ioAbsPkts io.IO_val */) (n int, err error)
 
 	// @ requires Mem()
 	// @ ensures  err != nil ==> err.ErrorMem()
@@ -679,8 +680,9 @@ func (d *DataPlane) AddSvc(svc addr.SVC, a netip.AddrPort) error {
 	d.svc.AddSvc(svc, a)
 	if d.Metrics != nil {
 		labels := serviceLabels(d.localIA, svc)
-		d.Metrics.ServiceInstanceChanges.With(labels).Add(1)
-		d.Metrics.ServiceInstanceCount.With(labels).Add(1)
+		// (VerifiedSCION): added the cast to float64 as gobra does not handle implicit cast to float64.
+		d.Metrics.ServiceInstanceChanges.With(labels).Add(float64(1))
+		d.Metrics.ServiceInstanceCount.With(labels).Add(float64(1))
 	}
 	// @ fold acc(d.Mem(), R15)
 	// @ fold MutexInvariant!<d!>()
@@ -702,8 +704,9 @@ func (d *DataPlane) DelSvc(svc addr.SVC, a netip.AddrPort) error {
 	d.svc.DelSvc(svc, a)
 	if d.Metrics != nil {
 		labels := serviceLabels(d.localIA, svc)
-		d.Metrics.ServiceInstanceChanges.With(labels).Add(1)
-		d.Metrics.ServiceInstanceCount.With(labels).Add(-1)
+		// (VerifiedSCION): added the cast to float64 as gobra does not handle implicit cast to float64.
+		d.Metrics.ServiceInstanceChanges.With(labels).Add(float64(1))
+		d.Metrics.ServiceInstanceCount.With(labels).Add(float64(-1))
 	}
 	return nil
 }
@@ -849,17 +852,6 @@ func (d *DataPlane) initPacketPool(cfg *RunConfig, processorQueueSize int) {
 	for i := 0; i < poolSize; i++ {
 		d.packetPool <- pktStructs[i].init(&pktBuffers[i])
 	}
-	// @ ghost if d.external != nil { fold acc(accBatchConn(d.external), R15) }
-	// @ ghost if d.internalNextHops != nil { fold acc(accAddr(d.internalNextHops), R15) }
-	// @ fold accForwardingMetrics(d.forwardingMetrics)
-	// @ unfold acc(hideLocalIA(&d.localIA), R15)
-	// @ assert d.dpSpecWellConfiguredLocalIA(dp)
-	// @ assert d.dpSpecWellConfiguredNeighborIAs(dp)
-	// @ assert d.dpSpecWellConfiguredLinkTypes(dp)
-	// @ fold d.Mem()
-	// @ reveal d.getDomExternal()
-	// @ reveal d.WellConfigured()
-	// @ assert reveal d.DpAgreesWithSpec(dp)
 }
 
 // initializes the processing routines and forwarders queues
@@ -1410,9 +1402,6 @@ func (p *scionPacketProcessor) processIntraBFD(data []byte) disposition {
 			break
 		}
 	}
-	// (VerifiedSCION) clean-up code to deal with range loop
-	// @ exhale m != nil ==> acc(m, R20)
-	// @ inhale m != nil ==> acc(m, _)
 
 	// @ assert acc(&p.d.bfdSessions, _)
 	// @ ghost if p.d.bfdSessions != nil { unfold acc(accBfdSession(p.d.bfdSessions), _) }

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +gobra
+
 package router
 
 // fnv1aOffset32 is an initial offset that can be used as initial state when calling
