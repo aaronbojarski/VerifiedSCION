@@ -1421,7 +1421,7 @@ func (p *scionPacketProcessor) processIntraBFD(data []byte) disposition {
 	return errorDiscard("error", noBFDSessionFound)
 }
 
-func (p *scionPacketProcessor) processSCION( /*@ ghost ub []byte @*/ ) disposition {
+func (p *scionPacketProcessor) processSCION( /*@ ghost ub []byte, ghost llIsNil bool, ghost startLL int, ghost endLL int, ghost ioLock gpointer[gsync.GhostMutex], ghost ioSharedArg SharedArg, ghost dp io.DataPlaneSpec @*/ ) disposition {
 
 	var ok bool
 	// @ unfold acc(p.scionLayer.Mem(ub), R20)
@@ -1431,7 +1431,7 @@ func (p *scionPacketProcessor) processSCION( /*@ ghost ub []byte @*/ ) dispositi
 		// TODO(lukedirtwalker) parameter problem invalid path?
 		return errorDiscard("error", malformedPath)
 	}
-	return p.process()
+	return p.process( /*@ ub, llIsNil, startLL, endLL , ioLock, ioSharedArg, dp @*/ )
 }
 
 // @ trusted
@@ -2122,7 +2122,7 @@ func (p *scionPacketProcessor) doXover( /*@ ghost ub []byte, ghost currBase scio
 func (p *scionPacketProcessor) ingressInterface( /*@ ghost ubPath []byte @*/ ) uint16 {
 	info := p.infoField
 	hop := p.hopField
-	if !p.peering && p.path.IsFirstHopAfterXover() {
+	if !p.peering && p.path.IsFirstHopAfterXover( /*@ ubPath @*/ ) {
 		var err error
 		info, err = p.path.GetInfoField(int( /*@ unfolding acc(p.path.Mem(ubPath), R45) in (unfolding acc(p.path.Base.Mem(), R50) in @*/ p.path.PathMeta.CurrINF /*@ ) @*/) - 1 /*@ , ubPath @*/)
 		if err != nil { // cannot be out of range
@@ -2185,7 +2185,14 @@ func (p *scionPacketProcessor) validateEgressUp() disposition {
 	return pForward
 }
 
-func (p *scionPacketProcessor) handleIngressRouterAlert() disposition {
+func (p *scionPacketProcessor) handleIngressRouterAlert( /*@ ghost ub []byte, ghost ubLL []byte, ghost startLL int, ghost endLL int @*/ ) disposition {
+	// @ reveal p.EqAbsHopField(absPkt(ub))
+	// @ assert let fut := absPkt(ub).CurrSeg.Future in
+	// @ 	fut == seq[io.IO_HF]{p.hopField.ToIO_HF()} ++ fut[1:]
+	// @ ghost ubPath := p.scionLayer.UBPath(ub)
+	// @ ghost startP := p.scionLayer.PathStartIdx(ub)
+	// @ ghost endP   := p.scionLayer.PathEndIdx(ub)
+	// @ assert ub[startP:endP] === ubPath
 	if p.pkt.ingress == 0 {
 		return pForward
 	}
@@ -2194,7 +2201,7 @@ func (p *scionPacketProcessor) handleIngressRouterAlert() disposition {
 		return pForward
 	}
 	*alert = false
-	if err := p.path.SetHopField(p.hopField, int(p.path.PathMeta.CurrHF)); err != nil {
+	if err := p.path.SetHopField(p.hopField, int( /*@ unfolding acc(p.path.Mem(ubPath), R50) in (unfolding acc(p.path.Base.Mem(), R55) in @*/ p.path.PathMeta.CurrHF /*@ ) @*/) /*@ , ubPath @*/); err != nil {
 		return errorDiscard("error", err)
 	}
 	p.pkt.slowPathRequest = slowPathRequest{
@@ -2213,7 +2220,14 @@ func (p *scionPacketProcessor) ingressRouterAlertFlag() (res *bool) {
 	return &p.hopField.IngressRouterAlert
 }
 
-func (p *scionPacketProcessor) handleEgressRouterAlert() disposition {
+func (p *scionPacketProcessor) handleEgressRouterAlert( /*@ ghost ub []byte, ghost ubLL []byte, ghost startLL int, ghost endLL int @*/ ) disposition {
+	// @ reveal p.EqAbsHopField(absPkt(ub))
+	// @ assert let fut := absPkt(ub).CurrSeg.Future in
+	// @ 	fut == seq[io.IO_HF]{p.hopField.ToIO_HF()} ++ fut[1:]
+	// @ ghost ubPath := p.scionLayer.UBPath(ub)
+	// @ ghost startP := p.scionLayer.PathStartIdx(ub)
+	// @ ghost endP   := p.scionLayer.PathEndIdx(ub)
+	// @ assert ub[startP:endP] === ubPath
 	alert := p.egressRouterAlertFlag()
 	if !*alert {
 		return pForward
@@ -2223,7 +2237,7 @@ func (p *scionPacketProcessor) handleEgressRouterAlert() disposition {
 		return pForward
 	}
 	*alert = false
-	if err := p.path.SetHopField(p.hopField, int(p.path.PathMeta.CurrHF)); err != nil {
+	if err := p.path.SetHopField(p.hopField, int( /*@ unfolding acc(p.path.Mem(ubPath), R50) in (unfolding acc(p.path.Base.Mem(), R55) in @*/ p.path.PathMeta.CurrHF /*@ ) @*/) /*@ , ubPath @*/); err != nil {
 		return errorDiscard("error", err)
 	}
 	p.pkt.slowPathRequest = slowPathRequest{
@@ -2242,9 +2256,12 @@ func (p *scionPacketProcessor) egressRouterAlertFlag() (res *bool) {
 	return &p.hopField.EgressRouterAlert
 }
 
-func (p *slowPathPacketProcessor) handleSCMPTraceRouteRequest(ifID uint16) error {
-
-	if p.lastLayer.NextLayerType() != slayers.LayerTypeSCMP {
+func (p *slowPathPacketProcessor) handleSCMPTraceRouteRequest(ifID uint16 /*@, ghost ubScionL []byte, ghost ubLL []byte, ghost startLL int, ghost endLL int @*/) error {
+	// @ ghost llIsScmp := false
+	// @ ghost scionPldIsNil := false
+	// @ ghost maybeStartPld := 0
+	// @ ghost maybeEndPld := 0
+	if p.lastLayer.NextLayerType( /*@ ubLL @*/ ) != slayers.LayerTypeSCMP {
 		log.Debug("Packet with router alert, but not SCMP")
 		return nil
 	}
@@ -2288,7 +2305,7 @@ func (p *slowPathPacketProcessor) handleSCMPTraceRouteRequest(ifID uint16) error
 		IA:         p.d.localIA,
 		Interface:  uint64(ifID),
 	}
-	return p.packSCMP(slayers.SCMPTypeTracerouteReply, 0, &scmpP, false)
+	return p.packSCMP(slayers.SCMPTypeTracerouteReply, 0, &scmpP, false /*@ ,ubScionL, ubLL, startLL, endLL, @*/)
 }
 
 func (p *scionPacketProcessor) validatePktLen() disposition {
@@ -2326,43 +2343,61 @@ func (p *scionPacketProcessor) validateSrcHost() disposition {
 	return pSlowPath
 }
 
-func (p *scionPacketProcessor) process() disposition {
-	if disp := p.parsePath(); disp != pForward {
+func (p *scionPacketProcessor) process(
+// @ 	ghost ub []byte,
+// @ 	ghost llIsNil bool,
+// @ 	ghost startLL int,
+// @ 	ghost endLL int,
+// @ 	ghost ioLock gpointer[gsync.GhostMutex],
+// @ 	ghost ioSharedArg SharedArg,
+// @ 	ghost dp io.DataPlaneSpec,
+) disposition {
+	// @ ghost ubLL := llIsNil ? ([]byte)(nil) : ub[startLL:endLL]
+	if disp := p.parsePath( /*@ ub @*/ ); disp != pForward {
 		return disp
 	}
+	// @ ghost var oldPkt io.IO_pkt2
+	// @ ghost if(slayers.IsSupportedPkt(ub)) {
+	// @ 	absIO_valLemma(ub, p.ingressID)
+	// @ 	oldPkt = absIO_val(ub, p.ingressID).IO_val_Pkt2_2
+	// @ } else {
+	// @ 	absPktFutureLemma(ub)
+	// @ 	oldPkt = absPkt(ub)
+	// @ }
+	// @ nextPkt := oldPkt
 	if disp := p.determinePeer(); disp != pForward {
 		return disp
 	}
-	if disp := p.validateHopExpiry(); disp != pForward {
+	if disp := p.validateHopExpiry( /*@ ub, ubLL, startLL, endLL @*/ ); disp != pForward {
 		return disp
 	}
-	if disp := p.validateIngressID(); disp != pForward {
+	if disp := p.validateIngressID( /*@ ub, ubLL, startLL, endLL @*/ ); disp != pForward {
 		return disp
 	}
-	if disp := p.validatePktLen(); disp != pForward {
+	if disp := p.validatePktLen( /*@ ub, ubLL, startLL, endLL @*/ ); disp != pForward {
 		return disp
 	}
-	if disp := p.validateTransitUnderlaySrc(); disp != pForward {
+	if disp := p.validateTransitUnderlaySrc( /*@ ub @*/ ); disp != pForward {
 		return disp
 	}
-	if disp := p.validateSrcDstIA(); disp != pForward {
+	if disp := p.validateSrcDstIA( /*@ ub, ubLL, startLL, endLL @*/ ); disp != pForward {
 		return disp
 	}
 	if disp := p.validateSrcHost(); disp != pForward {
 		return disp
 	}
-	if disp := p.updateNonConsDirIngressSegID(); disp != pForward {
+	if disp := p.updateNonConsDirIngressSegID( /*@ ub @*/ ); disp != pForward {
 		return disp
 	}
-	if disp := p.verifyCurrentMAC(); disp != pForward {
+	if disp := p.verifyCurrentMAC( /*@ dp, ub, ubLL, startLL, endLL @*/ ); disp != pForward {
 		return disp
 	}
-	if disp := p.handleIngressRouterAlert(); disp != pForward {
+	if disp := p.handleIngressRouterAlert( /*@ ub, ubLL, startLL, endLL @*/ ); disp != pForward {
 		return disp
 	}
 	// Inbound: pkt destined to the local IA.
 	if p.scionLayer.DstIA == p.d.localIA {
-		disp := p.resolveInbound()
+		disp /*@, aliasesUb @*/ := p.resolveInbound( /*@ ub, ubLL, startLL, endLL @*/ )
 		if disp != pForward {
 			return disp
 		}
@@ -2375,19 +2410,23 @@ func (p *scionPacketProcessor) process() disposition {
 	// * ASTransit in: from another AS, in via external, out via internal to other BR.
 	// * ASTransit out: from another AS, in via internal from other BR, out via external.
 	// * BRTransit: from another AS, in via external, out via external.
-	if p.path.IsXover() && !p.peering {
+	// @ ghost ubPath := p.scionLayer.UBPath(ub)
+	if p.path.IsXover( /*@ ubPath @*/ ) && !p.peering {
 		// An effective cross-over is a change of segment other than at
 		// a peering hop.
-		if disp := p.doXover(); disp != pForward {
+		// @ assert p.GetIsXoverSpec(ub)
+		// @ ghost currBase := p.path.GetBase(ubPath)
+		// @ fold acc(p.scionLayer.Mem(ub), R3)
+		if disp := p.doXover( /*@ ub, currBase @*/ ); disp != pForward {
 			return disp
 		}
 		// doXover() has changed the current segment and hop field.
 		// We need to validate the new hop field.
-		if disp := p.validateHopExpiry(); disp != pForward {
+		if disp := p.validateHopExpiry( /*@ ub, ubLL, startLL, endLL @*/ ); disp != pForward {
 			return disp
 		}
 		// verify the new block
-		if disp := p.verifyCurrentMAC(); disp != pForward {
+		if disp := p.verifyCurrentMAC( /*@ dp, ub, ubLL, startLL, endLL @*/ ); disp != pForward {
 			return disp
 		}
 		// @ assert AbsVerifyCurrentMACConstraint(nextPkt, dp)
@@ -2396,25 +2435,25 @@ func (p *scionPacketProcessor) process() disposition {
 
 	// Assign egress interface to the packet early. ICMP responses, if we make any, will need this.
 	// Even if the egress interface is not valid, it can be useful in SCMP reporting.
-	egressID := p.egressInterface()
+	egressID := p.egressInterface( /*@ nextPkt @*/ )
 	p.pkt.egress = egressID
 
-	if disp := p.validateEgressID(); disp != pForward {
+	if disp := p.validateEgressID( /*@ dp, ub, ubLL, startLL, endLL @*/ ); disp != pForward {
 		return disp
 	}
 
 	// handle egress router alert before we check if it's up because we want to
 	// send the reply anyway, so that trace route can pinpoint the exact link
 	// that failed.
-	if disp := p.handleEgressRouterAlert(); disp != pForward {
+	if disp := p.handleEgressRouterAlert( /*@ ub, ubLL, startLL, endLL @*/ ); disp != pForward {
 		return disp
 	}
-	if disp := p.validateEgressUp(); disp != pForward {
+	if disp := p.validateEgressUp( /*@ ub, ubLL, startLL, endLL @*/ ); disp != pForward {
 		return disp
 	}
 	if _, ok := p.d.external[egressID]; ok {
 		// Not ASTransit in
-		if disp := p.processEgress(); disp != pForward {
+		if disp := p.processEgress( /*@ ub @*/ ); disp != pForward {
 			return disp
 		}
 		// Finish deciding the trafficType...
@@ -2450,13 +2489,20 @@ func (p *scionPacketProcessor) process() disposition {
 	p.pkt.slowPathRequest = slowPathRequest{
 		scmpType: slayers.SCMPTypeParameterProblem,
 		code:     errCode,
-		pointer:  p.currentHopPointer(),
+		pointer:  p.currentHopPointer( /*@ ub @*/ ),
 	}
 	return pSlowPath
 }
 
 func (p *scionPacketProcessor) processOHP() disposition {
+	// @ ghost ubScionL := p.rawPkt
+	// @ p.scionLayer.ExtractAcc(ubScionL)
 	s := p.scionLayer
+	// @ ghost  ubPath := p.scionLayer.UBPath(ubScionL)
+	// @ unfold acc(p.scionLayer.Mem(ubScionL), R15)
+	// @ defer fold acc(p.scionLayer.Mem(ubScionL), R15)
+	// @ apply acc(&p.scionLayer, R16) --* acc(p.scionLayer.Mem(ubScionL), R15)
+	// @ assert s.Path === p.scionLayer.Path
 	ohp, ok := s.Path.(*onehop.Path)
 	if !ok {
 		// TODO parameter problem -> invalid path
@@ -2486,7 +2532,7 @@ func (p *scionPacketProcessor) processOHP() disposition {
 			// TODO parameter problem -> invalid MAC
 			return errorDiscard("error", macVerificationFailed)
 		}
-		ohp.Info.UpdateSegID(ohp.FirstHop.Mac)
+		ohp.Info.UpdateSegID(ohp.FirstHop.Mac /*@, ohp.FirstHop.ToIO_HF() @*/)
 
 		if err := updateSCIONLayer(p.pkt.rawPacket, s); err != nil {
 			return errorDiscard("error", err)
@@ -2517,7 +2563,7 @@ func (p *scionPacketProcessor) processOHP() disposition {
 	if err := updateSCIONLayer(p.pkt.rawPacket, s); err != nil {
 		return errorDiscard("error", err)
 	}
-	err := p.d.resolveLocalDst(p.pkt.dstAddr, s, p.lastLayer)
+	err := p.d.resolveLocalDst(p.pkt.dstAddr, s, p.lastLayer /*@ , ubScionL @*/)
 	if err != nil {
 		return errorDiscard("error", err)
 	}
@@ -2529,10 +2575,10 @@ func (d *DataPlane) resolveLocalDst(
 	resolvedDst *net.UDPAddr,
 	s slayers.SCION,
 	lastLayer gopacket.DecodingLayer,
+	/*@ ghost ub []byte, @*/
 ) error {
 
 	dst, err := s.DstAddr()
-	// @ apply acc(s, R16) --* acc(s.Mem(ub), R15)
 	if err != nil {
 		return invalidDstAddr
 	}

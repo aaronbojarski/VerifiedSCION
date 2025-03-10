@@ -60,6 +60,9 @@ func (ip Addr) Is4() bool
 decreases _
 func (ip Addr) Is6() bool
 
+decreases _
+func (ip Addr) Is4In6() bool
+
 ensures ip.IsValidSpec() ==> sl.Bytes(b, 0, len(b))
 decreases _
 func (ip Addr) AsSlice() (b []byte)
