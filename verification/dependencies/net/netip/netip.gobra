@@ -64,6 +64,9 @@ ensures ip.IsValidSpec() ==> sl.Bytes(b, 0, len(b))
 decreases _
 func (ip Addr) AsSlice() (b []byte)
 
+decreases _
+func AddrFromSlice(slice []byte) (ip Addr, ok bool)
+
 ghost
 pure
 decreases _

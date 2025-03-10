@@ -147,16 +147,17 @@ type BatchConn interface {
 	// @ 	sl.Bytes(msgs[j].GetFstBuffer(), 0, len(msgs[j].GetFstBuffer()))
 	// @ ensures   err != nil ==> err.ErrorMem()
 	// contracts for IO-spec
-	// @ requires  Prophecy(prophecyM)
-	// @ requires  io.token(place) && MultiReadBio(place, prophecyM)
-	// @ ensures   err != nil ==> prophecyM == 0
-	// @ ensures   err == nil ==> prophecyM == n
-	// @ ensures   io.token(old(MultiReadBioNext(place, prophecyM)))
-	// @ ensures   old(MultiReadBioCorrectIfs(place, prophecyM, path.ifsToIO_ifs(ingressID)))
-	// @ ensures   err == nil ==>
-	// @ 	forall i int :: { &msgs[i] } 0 <= i && i < n ==>
-	// @ 		MsgToAbsVal(&msgs[i], ingressID) == old(MultiReadBioIO_val(place, n)[i])
-	ReadBatch(msgs underlayconn.Messages /*@, ghost ingressID uint16, ghost prophecyM int, ghost place io.Place @*/) (n int, err error)
+	//  requires  Prophecy(prophecyM)
+	//  requires  io.token(place) && MultiReadBio(place, prophecyM)
+	//  ensures   err != nil ==> prophecyM == 0
+	//  ensures   err == nil ==> prophecyM == n
+	//  ensures   io.token(old(MultiReadBioNext(place, prophecyM)))
+	//  ensures   old(MultiReadBioCorrectIfs(place, prophecyM, path.ifsToIO_ifs(ingressID)))
+	//  ensures   err == nil ==>
+	//  	forall i int :: { &msgs[i] } 0 <= i && i < n ==>
+	//  		MsgToAbsVal(&msgs[i], ingressID) == old(MultiReadBioIO_val(place, n)[i])
+	// TODO(aaronbojarski): add ghost parameters again once actually verifying the function.
+	ReadBatch(msgs underlayconn.Messages /*, ghost ingressID uint16, ghost prophecyM int, ghost place io.Place */) (n int, err error)
 
 	// @ requires  acc(Mem(), _)
 	// (VerifiedSCION) opted for less reusable spec for WriteBatch for
@@ -1122,7 +1123,10 @@ func (p *slowPathPacketProcessor) processPacket(pkt *packet) error {
 	p.reset()
 	p.pkt = pkt
 
-	p.lastLayer, err = decodeLayers(pkt.rawPacket, &p.scionLayer, &p.hbhLayer, &p.e2eLayer)
+	// @ ghost var processed seq[bool]
+	// @ ghost var offsets   seq[offsetPair]
+	// @ ghost var lastLayerIdx int
+	p.lastLayer, err /*@, processed, offsets, lastLayerIdx @*/ = decodeLayers(pkt.rawPacket, &p.scionLayer, &p.hbhLayer, &p.e2eLayer)
 	if err != nil {
 		return err
 	}
@@ -1282,13 +1286,14 @@ func readUpTo(c <-chan *packet, n int, needsBlocking bool, pkts []*packet) int {
 	return i
 }
 
+// @ requires acc(d.Mem(), _) && d.getMacFactory() != nil
+// @ decreases
 func newPacketProcessor(d *DataPlane) *scionPacketProcessor {
 	p := &scionPacketProcessor{
 		d:              d,
-		mac:            d.macFactory(),
+		mac:            (d.macFactory() /*@ as MacFactorySpec{d.key} @ */),
 		macInputBuffer: make([]byte, max(path.MACBufferSize, libepic.MACBufferSize)),
 	}
-	// @ fold sl.Bytes(p.macBuffers.scionInput, 0, len(p.macBuffers.scionInput))
 	// @ fold slayers.PathPoolMem(p.scionLayer.pathPool, p.scionLayer.pathPoolRaw)
 	p.scionLayer.RecyclePaths()
 	// @ fold p.scionLayer.NonInitMem()
@@ -1331,23 +1336,26 @@ func (p *scionPacketProcessor) processPkt(pkt *packet) disposition {
 
 	// parse SCION header and skip extensions;
 	var err error
-	p.lastLayer, err = decodeLayers(pkt.rawPacket, &p.scionLayer, &p.hbhLayer, &p.e2eLayer)
+	// @ ghost var processed seq[bool]
+	// @ ghost var offsets   seq[offsetPair]
+	// @ ghost var lastLayerIdx int
+	p.lastLayer, err /*@, processed, offsets, lastLayerIdx @*/ = decodeLayers(pkt.rawPacket, &p.scionLayer, &p.hbhLayer, &p.e2eLayer)
 	if err != nil {
 		return errorDiscard("error", err)
 	}
-
-	pld := p.lastLayer.LayerPayload()
+	// @ ghost var ub []byte
+	pld /*@ , start, end @*/ := p.lastLayer.LayerPayload( /*@ ub @*/ )
 
 	pathType := p.scionLayer.PathType
 	switch pathType {
 	case empty.PathType:
-		if p.lastLayer.NextLayerType() == layers.LayerTypeBFD {
+		if p.lastLayer.NextLayerType( /*@ ub @*/ ) == layers.LayerTypeBFD {
 			return p.processIntraBFD(pld)
 		}
 		return errorDiscard("error", unsupportedPathTypeNextHeader)
 
 	case onehop.PathType:
-		if p.lastLayer.NextLayerType() == layers.LayerTypeBFD {
+		if p.lastLayer.NextLayerType( /*@ ub @*/ ) == layers.LayerTypeBFD {
 			ohp, ok := p.scionLayer.Path.(*onehop.Path)
 			if !ok {
 				return errorDiscard("error", malformedPath)
@@ -1356,9 +1364,9 @@ func (p *scionPacketProcessor) processPkt(pkt *packet) disposition {
 		}
 		return p.processOHP()
 	case scion.PathType:
-		return p.processSCION()
+		return p.processSCION( /*@ ub @*/ )
 	case epic.PathType:
-		return p.processEPIC()
+		return p.processEPIC( /*@ ub @*/ )
 	default:
 		return errorDiscard("error", unsupportedPathType)
 	}
@@ -1376,7 +1384,7 @@ func (p *scionPacketProcessor) processInterBFD(oh *onehop.Path, data []byte) dis
 	}
 
 	if v, ok := p.d.bfdSessions[p.pkt.ingress]; ok {
-		v.ReceiveMessage(bfd)
+		v.ReceiveMessage(bfd /*@, data @*/)
 		return pDiscard // All's fine. That packet's journey ends here.
 	}
 
@@ -1406,14 +1414,14 @@ func (p *scionPacketProcessor) processIntraBFD(data []byte) disposition {
 	// @ assert acc(&p.d.bfdSessions, _)
 	// @ ghost if p.d.bfdSessions != nil { unfold acc(accBfdSession(p.d.bfdSessions), _) }
 	if v, ok := p.d.bfdSessions[ifID]; ok {
-		v.ReceiveMessage(bfd)
+		v.ReceiveMessage(bfd /*@, data @*/)
 		return pDiscard // All's fine. That packet's journey ends here.
 	}
 
 	return errorDiscard("error", noBFDSessionFound)
 }
 
-func (p *scionPacketProcessor) processSCION() disposition {
+func (p *scionPacketProcessor) processSCION( /*@ ghost ub []byte @*/ ) disposition {
 
 	var ok bool
 	// @ unfold acc(p.scionLayer.Mem(ub), R20)
@@ -1423,10 +1431,12 @@ func (p *scionPacketProcessor) processSCION() disposition {
 		// TODO(lukedirtwalker) parameter problem invalid path?
 		return errorDiscard("error", malformedPath)
 	}
-	return p.process( /*@ ub, llIsNil, startLL, endLL , ioLock, ioSharedArg, dp @*/ )
+	return p.process()
 }
 
-func (p *scionPacketProcessor) processEPIC() disposition {
+// @ trusted
+// @ requires false
+func (p *scionPacketProcessor) processEPIC( /*@ ghost ub []byte @*/ ) disposition {
 
 	epicPath, ok := p.scionLayer.Path.(*epic.Path)
 	if !ok {
@@ -1438,8 +1448,8 @@ func (p *scionPacketProcessor) processEPIC() disposition {
 		return errorDiscard("error", malformedPath)
 	}
 
-	isPenultimate := p.path.IsPenultimateHop()
-	isLast := p.path.IsLastHop()
+	isPenultimate := p.path.IsPenultimateHop( /*@ ub @*/ )
+	isLast := p.path.IsLastHop( /*@ ub @*/ )
 
 	disp := p.process()
 	if disp != pForward {
@@ -1447,7 +1457,7 @@ func (p *scionPacketProcessor) processEPIC() disposition {
 	}
 
 	if isPenultimate || isLast {
-		firstInfo, err := p.path.GetInfoField(0)
+		firstInfo, err := p.path.GetInfoField(0 /*@, ub @*/)
 		if err != nil {
 			return errorDiscard("error", err)
 		}
@@ -1527,8 +1537,15 @@ func (p *slowPathPacketProcessor) packSCMP(
 	code slayers.SCMPCode,
 	scmpP gopacket.SerializableLayer,
 	isError bool,
+	// @ ghost ub []byte,
+	// @ ghost ubLL []byte,
+	// @ ghost startLL int,
+	// @ ghost endLL int,
 ) error {
-
+	// @ ghost llIsScmp := false
+	// @ ghost scmpPldIsNil := false
+	// @ ghost maybeStartPld := 0
+	// @ ghost maybeEndPld := 0
 	// check invoking packet was an SCMP error:
 	if p.lastLayer.NextLayerType( /*@ ubLL @*/ ) == slayers.LayerTypeSCMP {
 		// @ llIsScmp = true
@@ -1566,7 +1583,7 @@ func (p *slowPathPacketProcessor) packSCMP(
 	return nil
 }
 
-func (p *scionPacketProcessor) parsePath() disposition {
+func (p *scionPacketProcessor) parsePath( /*@ ghost ub []byte @*/ ) disposition {
 	var err error
 	// @ unfold acc(p.scionLayer.Mem(ub), R6)
 	// @ defer fold acc(p.scionLayer.Mem(ub), R6)
@@ -1601,7 +1618,7 @@ func (p *scionPacketProcessor) parsePath() disposition {
 	if !p.infoField.Peer && hasSingletonSegment {
 		return errorDiscard("error", malformedPath)
 	}
-	if !p.path.CurrINFMatchesCurrHF() {
+	if !p.path.CurrINFMatchesCurrHF( /*@ ub @*/ ) {
 		return errorDiscard("error", malformedPath)
 	}
 	return pForward
@@ -1641,7 +1658,7 @@ func (p *scionPacketProcessor) determinePeer() disposition {
 	return pForward
 }
 
-func (p *scionPacketProcessor) validateHopExpiry() disposition {
+func (p *scionPacketProcessor) validateHopExpiry( /*@ ghost ubScionL []byte, ghost ubLL []byte, ghost startLL int, ghost endLL int @*/ ) disposition {
 	expiration := util.SecsToTime(p.infoField.Timestamp).
 		Add(path.ExpTimeToDuration(p.hopField.ExpTime))
 	expired := expiration.Before(time.Now())
@@ -1654,12 +1671,12 @@ func (p *scionPacketProcessor) validateHopExpiry() disposition {
 	p.pkt.slowPathRequest = slowPathRequest{
 		scmpType: slayers.SCMPTypeParameterProblem,
 		code:     slayers.SCMPCodePathExpired,
-		pointer:  p.currentHopPointer(),
+		pointer:  p.currentHopPointer( /*@ ubScionL @*/ ),
 	}
 	return pSlowPath
 }
 
-func (p *scionPacketProcessor) validateIngressID() disposition {
+func (p *scionPacketProcessor) validateIngressID( /*@ ghost ubScionL []byte, ghost ubLL []byte, ghost startLL int, ghost endLL int@*/ ) disposition {
 	hdrIngressID := p.hopField.ConsIngress
 	errCode := slayers.SCMPCodeUnknownHopFieldIngress
 	if !p.infoField.ConsDir {
@@ -1672,14 +1689,25 @@ func (p *scionPacketProcessor) validateIngressID() disposition {
 		p.pkt.slowPathRequest = slowPathRequest{
 			scmpType: slayers.SCMPTypeParameterProblem,
 			code:     errCode,
-			pointer:  p.currentHopPointer(),
+			pointer:  p.currentHopPointer( /*@ ubScionL @*/ ),
 		}
 		return pSlowPath
 	}
 	return pForward
 }
 
-func (p *scionPacketProcessor) validateSrcDstIA() disposition {
+func (p *scionPacketProcessor) validateSrcDstIA( /*@ ghost ubScionL []byte, ghost ubLL []byte, ghost startLL int, ghost endLL int @*/ ) disposition {
+	// @ unfold acc(p.scionLayer.Mem(ubScionL), R20)
+	// @ defer fold acc(p.scionLayer.Mem(ubScionL), R20)
+	// @ ghost startP := p.scionLayer.PathStartIdx(ubScionL)
+	// @ ghost endP := p.scionLayer.PathEndIdx(ubScionL)
+	// @ ghost ubPath := ubScionL[startP:endP]
+	// @ sl.SplitRange_Bytes(ubScionL, startP, endP, R50)
+	// @ p.AbsPktToSubSliceAbsPkt(ubScionL, startP, endP)
+	// @ p.scionLayer.ValidHeaderOffsetToSubSliceLemma(ubScionL, startP)
+	// @ unfold acc(p.scionLayer.HeaderMem(ubScionL[slayers.CmnHdrLen:]), R20)
+	// @ defer fold acc(p.scionLayer.HeaderMem(ubScionL[slayers.CmnHdrLen:]), R20)
+	// @ p.d.getLocalIA()
 	srcIsLocal := (p.scionLayer.SrcIA == p.d.localIA)
 	dstIsLocal := (p.scionLayer.DstIA == p.d.localIA)
 	if p.pkt.ingress == 0 {
@@ -1687,19 +1715,19 @@ func (p *scionPacketProcessor) validateSrcDstIA() disposition {
 		// Only check SrcIA if first hop, for transit this already checked by ingress router.
 		// Note: SCMP error messages triggered by the sibling router may use paths that
 		// don't start with the first hop.
-		if p.path.IsFirstHop() && !srcIsLocal {
-			return p.respInvalidSrcIA()
+		if p.path.IsFirstHop( /*@ ubPath @*/ ) && !srcIsLocal {
+			return p.respInvalidSrcIA( /*@ ubScionL, ubLL, startLL, endLL @*/ )
 		}
 		if dstIsLocal {
-			return p.respInvalidDstIA()
+			return p.respInvalidDstIA( /*@ ubScionL, ubLL, startLL, endLL @*/ )
 		}
 	} else {
 		// Inbound
 		if srcIsLocal {
-			return p.respInvalidSrcIA()
+			return p.respInvalidSrcIA( /*@ ubScionL, ubLL, startLL, endLL @*/ )
 		}
-		if p.path.IsLastHop() != dstIsLocal {
-			return p.respInvalidDstIA()
+		if p.path.IsLastHop( /*@ ubPath @*/ ) != dstIsLocal {
+			return p.respInvalidDstIA( /*@ ubScionL, ubLL, startLL, endLL @*/ )
 		}
 		// @ ghost if(p.path.IsLastHopSpec(ubPath)) {
 		// @ 	p.path.LastHopLemma(ubPath)
@@ -1711,7 +1739,12 @@ func (p *scionPacketProcessor) validateSrcDstIA() disposition {
 }
 
 // invalidSrcIA is a helper to return an SCMP error for an invalid SrcIA.
-func (p *scionPacketProcessor) respInvalidSrcIA() disposition {
+func (p *scionPacketProcessor) respInvalidSrcIA(
+// @ 	ghost ub []byte,
+// @ 	ghost ubLL []byte,
+// @ 	ghost startLL int,
+// @ 	ghost endLL int,
+) disposition {
 	log.Debug("SCMP response", "cause", invalidSrcIA)
 	p.pkt.slowPathRequest = slowPathRequest{
 		scmpType: slayers.SCMPTypeParameterProblem,
@@ -1722,7 +1755,12 @@ func (p *scionPacketProcessor) respInvalidSrcIA() disposition {
 }
 
 // invalidDstIA is a helper to return an SCMP error for an invalid DstIA.
-func (p *scionPacketProcessor) respInvalidDstIA() disposition {
+func (p *scionPacketProcessor) respInvalidDstIA(
+// @ 	ghost ub []byte,
+// @ 	ghost ubLL []byte,
+// @ 	ghost startLL int,
+// @ 	ghost endLL int,
+) disposition {
 	log.Debug("SCMP response", "cause", invalidDstIA)
 	p.pkt.slowPathRequest = slowPathRequest{
 		scmpType: slayers.SCMPTypeParameterProblem,
@@ -1737,12 +1775,12 @@ func (p *scionPacketProcessor) respInvalidDstIA() disposition {
 // Provided that underlying network infrastructure prevents address spoofing,
 // this check prevents malicious end hosts in the local AS from bypassing the
 // SrcIA checks by disguising packets as transit traffic.
-func (p *scionPacketProcessor) validateTransitUnderlaySrc() disposition {
-	if p.path.IsFirstHop() || p.pkt.ingress != 0 {
+func (p *scionPacketProcessor) validateTransitUnderlaySrc( /*@ ghost ub []byte @*/ ) disposition {
+	if p.path.IsFirstHop( /*@ ub @*/ ) || p.pkt.ingress != 0 {
 		// not a transit packet, nothing to check
 		return pForward
 	}
-	pktIngressID := p.ingressInterface()
+	pktIngressID := p.ingressInterface( /*@ ub @*/ )
 	expectedSrc, okE := p.d.internalNextHops[pktIngressID]
 	if !okE {
 		// Drop
@@ -1757,7 +1795,7 @@ func (p *scionPacketProcessor) validateTransitUnderlaySrc() disposition {
 }
 
 // Validates the egress interface referenced by the current hop.
-func (p *scionPacketProcessor) validateEgressID() disposition {
+func (p *scionPacketProcessor) validateEgressID( /*@ ghost dp io.DataPlaneSpec, ghost ubScionL []byte, ghost ubLL []byte, ghost startLL int, ghost endLL int @*/ ) disposition {
 	egressID := p.pkt.egress
 	_, ih := p.d.internalNextHops[egressID]
 	_, eh := p.d.external[egressID]
@@ -1773,7 +1811,7 @@ func (p *scionPacketProcessor) validateEgressID() disposition {
 		p.pkt.slowPathRequest = slowPathRequest{
 			scmpType: slayers.SCMPTypeParameterProblem,
 			code:     errCode,
-			pointer:  p.currentHopPointer(),
+			pointer:  p.currentHopPointer( /*@ ubScionL @*/ ),
 		}
 		return pSlowPath
 	}
@@ -1804,7 +1842,7 @@ func (p *scionPacketProcessor) validateEgressID() disposition {
 			p.pkt.slowPathRequest = slowPathRequest{
 				scmpType: slayers.SCMPTypeParameterProblem,
 				code:     slayers.SCMPCodeInvalidPath, // XXX(matzf) new code InvalidHop?,
-				pointer:  p.currentHopPointer(),
+				pointer:  p.currentHopPointer( /*@ ubScionL @*/ ),
 			}
 			return pSlowPath
 		}
@@ -1829,19 +1867,24 @@ func (p *scionPacketProcessor) validateEgressID() disposition {
 		p.pkt.slowPathRequest = slowPathRequest{
 			scmpType: slayers.SCMPTypeParameterProblem,
 			code:     slayers.SCMPCodeInvalidSegmentChange,
-			pointer:  p.currentInfoPointer(),
+			pointer:  p.currentInfoPointer( /*@ ubScionL @*/ ),
 		}
 		return pSlowPath
 	}
 }
 
-func (p *scionPacketProcessor) updateNonConsDirIngressSegID() disposition {
+func (p *scionPacketProcessor) updateNonConsDirIngressSegID( /*@ ghost ub []byte @*/ ) disposition {
+	// @ ghost ubPath := p.scionLayer.UBPath(ub)
+	// @ ghost start := p.scionLayer.PathStartIdx(ub)
+	// @ ghost end   := p.scionLayer.PathEndIdx(ub)
+	// @ assert ub[start:end] === ubPath
+
 	// against construction dir the ingress router updates the SegID, ifID == 0
 	// means this comes from this AS itself, so nothing has to be done.
 	// For packets destined to peer links this shouldn't be updated.
 	if !p.infoField.ConsDir && p.pkt.ingress != 0 && !p.peering {
-		p.infoField.UpdateSegID(p.hopField.Mac)
-		if err := p.path.SetInfoField(p.infoField, int(p.path.PathMeta.CurrINF)); err != nil {
+		p.infoField.UpdateSegID(p.hopField.Mac /*@, p.hopField.ToIO_HF() @*/)
+		if err := p.path.SetInfoField(p.infoField, int(p.path.PathMeta.CurrINF) /*@, ubPath, @*/); err != nil {
 			return errorDiscard("error", err)
 		}
 		// @ ghost sl.CombineRange_Bytes(ub, start, end, HalfPerm)
@@ -1897,7 +1940,7 @@ func (p *scionPacketProcessor) currentHopPointer( /*@ ghost ubScionL []byte @*/ 
 		scion.MetaLen + path.InfoLen*p.path.NumINF + path.HopLen*int(p.path.PathMeta.CurrHF))
 }
 
-func (p *scionPacketProcessor) verifyCurrentMAC() disposition {
+func (p *scionPacketProcessor) verifyCurrentMAC( /*@ ghost dp io.DataPlaneSpec, ghost ubScionL []byte, ghost ubLL []byte, ghost startLL int, ghost endLL int @*/ ) disposition {
 	fullMac := path.FullMAC(p.mac, p.infoField, p.hopField, p.macInputBuffer[:path.MACBufferSize])
 	if subtle.ConstantTimeCompare(p.hopField.Mac[:path.MacLen], fullMac[:path.MacLen]) == 0 {
 		log.Debug("SCMP response", "cause", macVerificationFailed,
@@ -1909,7 +1952,7 @@ func (p *scionPacketProcessor) verifyCurrentMAC() disposition {
 		p.pkt.slowPathRequest = slowPathRequest{
 			scmpType: slayers.SCMPTypeParameterProblem,
 			code:     slayers.SCMPCodeInvalidHopFieldMAC,
-			pointer:  p.currentHopPointer(),
+			pointer:  p.currentHopPointer( /*@ ubScionL @*/ ),
 		}
 		return pSlowPath
 	}
@@ -1945,15 +1988,33 @@ func (p *scionPacketProcessor) resolveInbound() disposition {
 	}
 }
 
-func (p *scionPacketProcessor) processEgress() disposition {
+func (p *scionPacketProcessor) processEgress( /*@ ghost ub []byte @*/ ) disposition {
+	// @ ghost ubPath := p.scionLayer.UBPath(ub)
+	// @ ghost startP := p.scionLayer.PathStartIdx(ub)
+	// @ ghost endP   := p.scionLayer.PathEndIdx(ub)
+	// @ assert ub[startP:endP] === ubPath
+
+	// @ unfold acc(p.scionLayer.Mem(ub), 1-R55)
+	// @ sl.SplitRange_Bytes(ub, startP, endP, HalfPerm)
+	// @ sl.SplitByIndex_Bytes(ub, 0, startP, slayers.CmnHdrLen, R54)
+	// @ sl.Reslice_Bytes(ub, 0, slayers.CmnHdrLen, R54)
+	// @ slayers.IsSupportedPktSubslice(ub, slayers.CmnHdrLen)
+	// @ p.AbsPktToSubSliceAbsPkt(ub, startP, endP)
+	// @ p.scionLayer.ValidHeaderOffsetToSubSliceLemma(ub, startP)
+	// @ reveal p.EqAbsInfoField(absPkt(ub))
+	// @ reveal p.EqAbsHopField(absPkt(ub))
+	// @ sl.SplitRange_Bytes(ub, startP, endP, HalfPerm)
+	// @ reveal p.scionLayer.ValidHeaderOffset(ub, startP)
+	// @ unfold acc(p.scionLayer.Mem(ub), R55)
+
 	// We are the egress router and if we go in construction direction we
 	// need to update the SegID (unless we are effecting a peering hop).
 	// When we're at a peering hop, the SegID for this hop and for the next
 	// are one and the same, both hops chain to the same parent. So do not
 	// update SegID.
 	if p.infoField.ConsDir && !p.peering {
-		p.infoField.UpdateSegID(p.hopField.Mac)
-		if err := p.path.SetInfoField(p.infoField, int(p.path.PathMeta.CurrINF)); err != nil {
+		p.infoField.UpdateSegID(p.hopField.Mac /*@, p.hopField.ToIO_HF() @*/)
+		if err := p.path.SetInfoField(p.infoField, int(p.path.PathMeta.CurrINF) /*@ , ubPath @*/); err != nil {
 			// TODO parameter problem invalid path
 			return errorDiscard("error", err)
 		}
@@ -1971,9 +2032,31 @@ func (p *scionPacketProcessor) processEgress() disposition {
 	return pForward
 }
 
-func (p *scionPacketProcessor) doXover() disposition {
+func (p *scionPacketProcessor) doXover( /*@ ghost ub []byte, ghost currBase scion.Base @*/ ) disposition {
 	p.effectiveXover = true
-	if err := p.path.IncPath(); err != nil {
+	// @ ghost  startP := p.scionLayer.PathStartIdx(ub)
+	// @ ghost  endP   := p.scionLayer.PathEndIdx(ub)
+	// @ ghost  ubPath := ub[startP:endP]
+
+	// @ unfold acc(p.scionLayer.Mem(ub), 1-R55)
+	// @ sl.SplitRange_Bytes(ub, startP, endP, HalfPerm)
+	// @ sl.SplitByIndex_Bytes(ub, 0, startP, slayers.CmnHdrLen, R54)
+	// @ sl.Reslice_Bytes(ub, 0, slayers.CmnHdrLen, R54)
+	// @ slayers.IsSupportedPktSubslice(ub, slayers.CmnHdrLen)
+	// @ assert p.path == p.scionLayer.GetPath(ub)
+	// @ p.AbsPktToSubSliceAbsPkt(ub, startP, endP)
+	// @ assert p.path == p.scionLayer.GetPath(ub)
+	// @ p.scionLayer.ValidHeaderOffsetToSubSliceLemma(ub, startP)
+	// @ ghost preAbsPkt := p.path.absPkt(ubPath)
+	// @ p.path.XoverLemma(ubPath)
+	// @ reveal p.EqAbsInfoField(absPkt(ub))
+	// @ reveal p.EqAbsHopField(absPkt(ub))
+	// @ sl.SplitRange_Bytes(ub, startP, endP, HalfPerm)
+	// @ reveal p.scionLayer.ValidHeaderOffset(ub, startP)
+	// @ unfold acc(p.scionLayer.Mem(ub), R55)
+	// @ assert p.path.GetBase(ubPath) == currBase
+	// @ ghost nextBase := currBase.IncPathSpec()
+	if err := p.path.IncPath( /*@ ubPath @*/ ); err != nil {
 		// TODO parameter problem invalid path
 		return errorDiscard("error", err)
 	}
