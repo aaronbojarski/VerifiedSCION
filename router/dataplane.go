@@ -2577,6 +2577,7 @@ func (d *DataPlane) resolveLocalDst(
 	lastLayer gopacket.DecodingLayer,
 	/*@ ghost ub []byte, @*/
 ) error {
+	//@ share s
 
 	dst, err := s.DstAddr()
 	if err != nil {
@@ -2610,7 +2611,7 @@ func (d *DataPlane) resolveLocalDst(
 		if dstIP.IsUnspecified() {
 			return unsupportedUnspecifiedAddress
 		}
-		return d.addEndhostPort(resolvedDst, lastLayer, dstIP)
+		return d.addEndhostPort(resolvedDst, lastLayer, dstIP /*@, ub @*/)
 	default:
 		panic("unexpected address type returned from DstAddr")
 	}
@@ -2620,31 +2621,34 @@ func (d *DataPlane) addEndhostPort(
 	resolvedDst *net.UDPAddr,
 	lastLayer gopacket.DecodingLayer,
 	dst netip.Addr,
+	/*@ ghost ub []byte, @*/
 ) error {
 
 	// Parse UPD port and rewrite underlay IP/UDP port
-	l4Type := nextHdr(lastLayer)
+	l4Type := nextHdr(lastLayer /*@, ub @*/)
 	port := uint16(topology.EndhostPort)
 
 	switch l4Type {
 	case slayers.L4UDP:
-		if len(lastLayer.LayerPayload()) < 8 {
+		if data /*@ , start, end @*/ := lastLayer.LayerPayload( /*@ ub @*/ ); len(data) < 8 {
 			// TODO(JordiSubira): Treat this as a parameter problem
 			return serrors.New("SCION/UDP header len too small", "length",
-				len(lastLayer.LayerPayload()))
+				len(data))
 		}
-		port = binary.BigEndian.Uint16(lastLayer.LayerPayload()[2:])
+		data /*@ , start, end @*/ := lastLayer.LayerPayload( /*@ ub @*/ )
+		port = binary.BigEndian.Uint16(data[2:])
 		if port < d.dispatchedPortStart || port > d.dispatchedPortEnd {
 			port = topology.EndhostPort
 		}
 	case slayers.L4SCMP:
-		var scmpLayer slayers.SCMP
-		err := scmpLayer.DecodeFromBytes(lastLayer.LayerPayload(), gopacket.NilDecodeFeedback)
+		var scmpLayer /*@@@*/ slayers.SCMP
+		data /*@ , start, end @*/ := lastLayer.LayerPayload( /*@ ub @*/ )
+		err := scmpLayer.DecodeFromBytes(data, gopacket.NilDecodeFeedback)
 		if err != nil {
 			// TODO(JordiSubira): Treat this as a parameter problem.
 			return serrors.Wrap("decoding SCMP layer for extracting endhost dst port", err)
 		}
-		port, err = getDstPortSCMP(&scmpLayer)
+		port, err = getDstPortSCMP(&scmpLayer /*@, ub @*/)
 		if err != nil {
 			// TODO(JordiSubira): Treat this as a parameter problem.
 			return serrors.Wrap("getting dst port from SCMP message", err)
@@ -2660,7 +2664,7 @@ func (d *DataPlane) addEndhostPort(
 	return nil
 }
 
-func getDstPortSCMP(scmp *slayers.SCMP) (uint16, error) {
+func getDstPortSCMP(scmp *slayers.SCMP /*@, ghost ub []byte @*/) (uint16, error) {
 	// XXX(JordiSubira): This implementation is far too slow for the dataplane.
 	// We should reimplement this with fewer helpers and memory allocations, since
 	// our sole goal is to parse the L4 port or identifier in the offending packets.
@@ -2669,7 +2673,7 @@ func getDstPortSCMP(scmp *slayers.SCMP) (uint16, error) {
 		return topology.EndhostPort, nil
 	}
 	if scmp.TypeCode.Type() == slayers.SCMPTypeEchoReply {
-		var scmpEcho slayers.SCMPEcho
+		var scmpEcho /*@@@*/ slayers.SCMPEcho
 		err := scmpEcho.DecodeFromBytes(scmp.Payload, gopacket.NilDecodeFeedback)
 		if err != nil {
 			return 0, err
@@ -2677,7 +2681,7 @@ func getDstPortSCMP(scmp *slayers.SCMP) (uint16, error) {
 		return scmpEcho.Identifier, nil
 	}
 	if scmp.TypeCode.Type() == slayers.SCMPTypeTracerouteReply {
-		var scmpTraceroute slayers.SCMPTraceroute
+		var scmpTraceroute /*@@@*/ slayers.SCMPTraceroute
 		err := scmpTraceroute.DecodeFromBytes(scmp.Payload, gopacket.NilDecodeFeedback)
 		if err != nil {
 			return 0, err
@@ -2686,11 +2690,11 @@ func getDstPortSCMP(scmp *slayers.SCMP) (uint16, error) {
 	}
 
 	// Drop unknown SCMP error messages.
-	if scmp.NextLayerType() == gopacket.LayerTypePayload {
+	if scmp.NextLayerType( /*@ ub @*/ ) == gopacket.LayerTypePayload {
 		return 0, serrors.New("unsupported SCMP error message",
 			"type", scmp.TypeCode.Type())
 	}
-	l, err := decodeSCMP(scmp)
+	l, err := decodeSCMP(scmp /*@, ub @*/)
 	if err != nil {
 		return 0, err
 	}
@@ -2747,8 +2751,8 @@ func getDstPortSCMP(scmp *slayers.SCMP) (uint16, error) {
 }
 
 // decodeSCMP decodes the SCMP payload. WARNING: Decoding is done with NoCopy set.
-func decodeSCMP(scmp *slayers.SCMP) ([]gopacket.SerializableLayer, error) {
-	gpkt := gopacket.NewPacket(scmp.Payload, scmp.NextLayerType(),
+func decodeSCMP(scmp *slayers.SCMP /*@, ghost ub []byte @*/) ([]gopacket.SerializableLayer, error) {
+	gpkt := gopacket.NewPacket(scmp.Payload, scmp.NextLayerType( /*@ ub @*/ ),
 		gopacket.DecodeOptions{NoCopy: true})
 	layers := gpkt.Layers()
 	if len(layers) == 0 || len(layers) > 2 {
@@ -2772,10 +2776,11 @@ func decodeSCMP(scmp *slayers.SCMP) ([]gopacket.SerializableLayer, error) {
 // function to replace a header with a smaller one; but the rawPacket's slice must be fixed
 // afterwards (and the preceding headers, if any).
 func updateSCIONLayer(rawPkt []byte, s slayers.SCION) error {
-	payloadOffset := len(rawPkt) - len(s.LayerPayload())
+	data /*@, start, end @*/ := s.LayerPayload( /*@ rawPkt @*/ )
+	payloadOffset := len(rawPkt) - len(data)
 
 	// Prepends must go just before payload. (and any Append will wreck it)
-	serBuf := newSerializeProxyStart(rawPkt, payloadOffset)
+	serBuf /*@@@*/ := newSerializeProxyStart(rawPkt, payloadOffset)
 	return s.SerializeTo(&serBuf, gopacket.SerializeOptions{})
 }
 
@@ -2914,6 +2919,8 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 	code slayers.SCMPCode,
 	scmpP gopacket.SerializableLayer,
 	isError bool,
+	/*@ ghost ub []byte, @*/
+
 ) error {
 
 	// *copy* and reverse path -- the original path should not be modified as this writes directly
@@ -2982,7 +2989,7 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 	}
 
 	// Revert potential path segment switches that were done during processing.
-	if revPath.IsXover() && !peering {
+	if revPath.IsXover( /*@ rawPath @*/ ) && !peering {
 		// An effective cross-over is a change of segment other than at
 		// a peering hop.
 		if err := revPath.IncPath(); err != nil {
@@ -3004,9 +3011,9 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 		infoField := &revPath.InfoFields[revPath.PathMeta.CurrINF]
 		if infoField.ConsDir && !peering {
 			hopField := revPath.HopFields[revPath.PathMeta.CurrHF]
-			infoField.UpdateSegID(hopField.Mac)
+			infoField.UpdateSegID(hopField.Mac /*@, hopField.ToIO_HF() @*/)
 		}
-		if err := revPath.IncPath(); err != nil {
+		if err := revPath.IncPath( /*@ rawPath @*/ ); err != nil {
 			return serrors.JoinNoStack(cannotRoute, err,
 				"details", "incrementing path for SCMP")
 		}
@@ -3049,7 +3056,7 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 	var quote []byte
 	if isError {
 		// add quote for errors.
-		hdrLen := slayers.CmnHdrLen + scionL.AddrHdrLen() + scionL.Path.Len()
+		hdrLen := slayers.CmnHdrLen + scionL.AddrHdrLen( /*@ nil, false @*/ ) + scionL.Path.Len( /*@ nil @*/ )
 		if needsAuth {
 			hdrLen += e2eAuthHdrLen
 		}
@@ -3068,7 +3075,7 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 		}
 	}
 
-	serBuf := newSerializeProxy(p.pkt.rawPacket) // Prepend-only by default. It's all we need.
+	serBuf /*@@@*/ := newSerializeProxy(p.pkt.rawPacket) // Prepend-only by default. It's all we need.
 	sopts := gopacket.SerializeOptions{
 		ComputeChecksums: true,
 		FixLengths:       true,
@@ -3156,7 +3163,7 @@ func (p *slowPathPacketProcessor) resetSPAOMetadata(key drkey.ASHostKey, now tim
 	})
 }
 
-func (p *slowPathPacketProcessor) hasValidAuth(t time.Time) bool {
+func (p *slowPathPacketProcessor) hasValidAuth(t time.Time /*@, ghost ub []byte @*/) bool {
 	// Check if e2eLayer was parsed for this packet
 	if !p.lastLayer.CanDecode().Contains(slayers.LayerTypeEndToEndExtn) {
 		return false
@@ -3202,7 +3209,7 @@ func (p *slowPathPacketProcessor) hasValidAuth(t time.Time) bool {
 			Header:     authOption,
 			ScionLayer: &p.scionLayer,
 			PldType:    slayers.L4SCMP,
-			Pld:        p.lastLayer.LayerPayload(),
+			Pld:        p.lastLayer.LayerPayload( /*@ ub @*/ ),
 		},
 		p.macInputBuffer,
 		p.validAuthBuf,
@@ -3449,5 +3456,5 @@ func updateNetAddrFromNetAddr(netAddr *net.UDPAddr, fromNetAddr *net.UDPAddr) {
 	netAddr.Port = fromNetAddr.Port
 	netAddr.Zone = fromNetAddr.Zone
 	netAddr.IP = netAddr.IP[0:len(fromNetAddr.IP)]
-	copy(netAddr.IP, fromNetAddr.IP)
+	copy(netAddr.IP, fromNetAddr.IP /*@, R10 @*/)
 }

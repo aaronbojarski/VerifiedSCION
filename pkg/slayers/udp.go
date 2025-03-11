@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +gobra
+
 package slayers
 
 import (
@@ -36,6 +38,8 @@ type UDP struct {
 	scn              *SCION
 }
 
+// @ decreases
+// @ pure
 func (u *UDP) LayerType() gopacket.LayerType {
 	return LayerTypeSCIONUDP
 }
