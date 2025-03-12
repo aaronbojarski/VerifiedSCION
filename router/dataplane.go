@@ -789,7 +789,7 @@ type RunConfig struct {
 	BatchSize             int
 }
 
-func (d *DataPlane) Run(ctx context.Context, cfg *RunConfig) error {
+func (d *DataPlane) Run(ctx context.Context, cfg *RunConfig /*@, ghost place io.Place, ghost state io.IO_dp3s_state_local, ghost dp io.DataPlaneSpec @*/) error {
 	d.mtx.Lock()
 	d.initMetrics()
 
@@ -1571,7 +1571,7 @@ func (p *slowPathPacketProcessor) packSCMP(
 		}
 	}
 
-	if err := p.prepareSCMP(typ, code, scmpP, isError); err != nil {
+	if err := p.prepareSCMP(typ, code, scmpP, isError /*@, ub @*/); err != nil {
 		return err
 	}
 
@@ -1963,8 +1963,8 @@ func (p *scionPacketProcessor) verifyCurrentMAC( /*@ ghost dp io.DataPlaneSpec, 
 	return pForward
 }
 
-func (p *scionPacketProcessor) resolveInbound() disposition {
-	err := p.d.resolveLocalDst(p.pkt.dstAddr, p.scionLayer, p.lastLayer)
+func (p *scionPacketProcessor) resolveInbound( /*@ ghost ubScionL []byte, ghost ubLL []byte, ghost startLL int, ghost endLL int @*/ ) (disp disposition /*@ , ghost addrAliasesUb bool @*/) {
+	err := p.d.resolveLocalDst(p.pkt.dstAddr, p.scionLayer, p.lastLayer /*@ , ubScionL @*/)
 
 	switch err {
 	case nil:
@@ -1975,16 +1975,16 @@ func (p *scionPacketProcessor) resolveInbound() disposition {
 			scmpType: slayers.SCMPTypeDestinationUnreachable,
 			code:     slayers.SCMPCodeNoRoute,
 		}
-		return pSlowPath
+		return pSlowPath /*@ , false @*/
 	case invalidDstAddr, unsupportedV4MappedV6Address, unsupportedUnspecifiedAddress:
 		log.Debug("SCMP response", "cause", err)
 		p.pkt.slowPathRequest = slowPathRequest{
 			scmpType: slayers.SCMPTypeParameterProblem,
 			code:     slayers.SCMPCodeInvalidDestinationAddress,
 		}
-		return pSlowPath
+		return pSlowPath /*@ , false @*/
 	default:
-		return errorDiscard("error", err)
+		return errorDiscard("error", err) /*@ , true @*/
 	}
 }
 
@@ -2163,7 +2163,12 @@ func (p *scionPacketProcessor) egressInterface( /*@ ghost oldPkt io.IO_pkt2 @*/ 
 	return p.hopField.ConsIngress
 }
 
-func (p *scionPacketProcessor) validateEgressUp() disposition {
+func (p *scionPacketProcessor) validateEgressUp(
+// @ 	ghost ub []byte,
+// @ 	ghost ubLL []byte,
+// @ 	ghost startLL int,
+// @ 	ghost endLL int,
+) disposition {
 	egressID := p.pkt.egress
 	if v, ok := p.d.bfdSessions[egressID]; ok {
 		if !v.IsUp() {
@@ -2305,10 +2310,10 @@ func (p *slowPathPacketProcessor) handleSCMPTraceRouteRequest(ifID uint16 /*@, g
 		IA:         p.d.localIA,
 		Interface:  uint64(ifID),
 	}
-	return p.packSCMP(slayers.SCMPTypeTracerouteReply, 0, &scmpP, false /*@ ,ubScionL, ubLL, startLL, endLL, @*/)
+	return p.packSCMP(slayers.SCMPTypeTracerouteReply, 0, &scmpP, false /*@ ,ubScionL, ubLL, startLL, endLL @*/)
 }
 
-func (p *scionPacketProcessor) validatePktLen() disposition {
+func (p *scionPacketProcessor) validatePktLen( /*@ ghost ubScionL []byte, ghost ubLL []byte, ghost startLL int, ghost endLL int @*/ ) disposition {
 	if int(p.scionLayer.PayloadLen) == len(p.scionLayer.Payload) {
 		return pForward
 	}
@@ -2358,8 +2363,9 @@ func (p *scionPacketProcessor) process(
 	}
 	// @ ghost var oldPkt io.IO_pkt2
 	// @ ghost if(slayers.IsSupportedPkt(ub)) {
-	// @ 	absIO_valLemma(ub, p.ingressID)
-	// @ 	oldPkt = absIO_val(ub, p.ingressID).IO_val_Pkt2_2
+	// TODO(aaronbojarski): add IO operations again. Not sure yet what ingressID we have, as it is no longer a parameter.
+	//  	absIO_valLemma(ub, p.ingressID)
+	//  	oldPkt = absIO_val(ub, p.ingressID).IO_val_Pkt2_2
 	// @ } else {
 	// @ 	absPktFutureLemma(ub)
 	// @ 	oldPkt = absPkt(ub)
@@ -2495,7 +2501,7 @@ func (p *scionPacketProcessor) process(
 }
 
 func (p *scionPacketProcessor) processOHP() disposition {
-	// @ ghost ubScionL := p.rawPkt
+	// @ ghost ubScionL := p.pkt.rawPacket
 	// @ p.scionLayer.ExtractAcc(ubScionL)
 	s := p.scionLayer
 	// @ ghost  ubPath := p.scionLayer.UBPath(ubScionL)
@@ -2527,7 +2533,7 @@ func (p *scionPacketProcessor) processOHP() disposition {
 		if !neighborIA.Equal(s.DstIA) {
 			return errorDiscard("error", cannotRoute)
 		}
-		mac := path.MAC(p.mac, ohp.Info, ohp.FirstHop, p.macInputBuffer[:path.MACBufferSize])
+		mac /*@@@*/ := path.MAC(p.mac, ohp.Info, ohp.FirstHop, p.macInputBuffer[:path.MACBufferSize])
 		if subtle.ConstantTimeCompare(ohp.FirstHop.Mac[:], mac[:]) == 0 {
 			// TODO parameter problem -> invalid MAC
 			return errorDiscard("error", macVerificationFailed)
@@ -2776,6 +2782,8 @@ func decodeSCMP(scmp *slayers.SCMP /*@, ghost ub []byte @*/) ([]gopacket.Seriali
 // function to replace a header with a smaller one; but the rawPacket's slice must be fixed
 // afterwards (and the preceding headers, if any).
 func updateSCIONLayer(rawPkt []byte, s slayers.SCION) error {
+	// @ ghost var start int
+	// @ ghost var end int
 	data /*@, start, end @*/ := s.LayerPayload( /*@ rawPkt @*/ )
 	payloadOffset := len(rawPkt) - len(data)
 
@@ -3001,13 +3009,6 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 	// path to prepare it for the next hop.
 	_, external := p.d.external[p.pkt.ingress]
 	if external {
-		// @ requires revPath.Mem(rawPath)
-		// @ requires revPath.GetBase(rawPath).Valid()
-		// @ ensures  revPath.Mem(rawPath)
-		// @ decreases
-		// @ outline(
-		// @ unfold revPath.Mem(rawPath)
-		// @ unfold revPath.Base.Mem()
 		infoField := &revPath.InfoFields[revPath.PathMeta.CurrINF]
 		if infoField.ConsDir && !peering {
 			hopField := revPath.HopFields[revPath.PathMeta.CurrHF]
@@ -3017,7 +3018,6 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 			return serrors.JoinNoStack(cannotRoute, err,
 				"details", "incrementing path for SCMP")
 		}
-		// @ )
 	}
 	// @ TODO()
 
@@ -3050,7 +3050,7 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 		// if SCMPTypeTracerouteReply to create the response.
 		needsAuth = isError ||
 			(scmpH.TypeCode.Type() == slayers.SCMPTypeTracerouteReply &&
-				p.hasValidAuth(time.Now()))
+				p.hasValidAuth(time.Now() /*@ , ub @*/))
 	}
 
 	var quote []byte
@@ -3091,7 +3091,7 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 	}
 
 	if needsAuth {
-		var e2e slayers.EndToEndExtn
+		var e2e /* @@@ */ slayers.EndToEndExtn
 		scionL.NextHdr = slayers.End2EndClass
 
 		now := time.Now()
@@ -3131,7 +3131,7 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 	} else {
 		scionL.NextHdr = slayers.L4SCMP
 	}
-	if err := scionL.SerializeTo(&serBuf, sopts); err != nil {
+	if err := scionL.SerializeTo(&serBuf, sopts /*@, ub @*/); err != nil {
 		return serrors.JoinNoStack(cannotRoute, err, "details", "serializing SCION header")
 	}
 	p.pkt.rawPacket = serBuf.Bytes()
@@ -3434,13 +3434,13 @@ func updateNetAddrFromAddrAndPort(netAddr *net.UDPAddr, addr netip.Addr, port ui
 	netAddr.Port = int(port)
 	netAddr.Zone = addr.Zone()
 	if addr.Is4() {
-		outIpBytes := addr.As4()     // Must store explicitly in order to copy
-		netAddr.IP = netAddr.IP[0:4] // Update slice
-		copy(netAddr.IP, outIpBytes[:])
+		outIpBytes /*@@@*/ := addr.As4() // Must store explicitly in order to copy
+		netAddr.IP = netAddr.IP[0:4]     // Update slice
+		copy(netAddr.IP, outIpBytes[:] /*@, R10 @*/)
 	} else if addr.Is6() {
-		outIpBytes := addr.As16()
+		outIpBytes /*@@@*/ := addr.As16()
 		netAddr.IP = netAddr.IP[0:16]
-		copy(netAddr.IP, outIpBytes[:])
+		copy(netAddr.IP, outIpBytes[:] /*@, R10 @*/)
 	} else {
 		// That's a zero address. We translate in to something resembling a nil IP.
 		// Nothing gets discarded as we keep the slice (and its reference to the backing array).

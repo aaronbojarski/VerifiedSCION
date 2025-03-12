@@ -18,6 +18,7 @@ package router
 
 import (
 	"github.com/gopacket/gopacket"
+	// @ . "github.com/scionproto/scion/verification/utils/definitions"
 )
 
 // serializeProxy implements gopacket.SerializeBuffer. It is a very simple implementation that
@@ -47,7 +48,7 @@ func newSerializeProxy(buf []byte) serializeProxy {
 // newSerializeProxyStart returns a new serializeProxy. The initial prepend/append point is set to
 // the given start value. This has the same effect as calling clear(statr).
 func newSerializeProxyStart(buf []byte, start int) serializeProxy {
-	serBuf := serializeProxy{
+	serBuf /*@@@*/ := serializeProxy{
 		data: buf,
 	}
 	serBuf.clear(start)
@@ -101,5 +102,5 @@ func (s *serializeProxy) Layers() []gopacket.LayerType {
 
 // Bytes implements serializeBuffer.PushLayer.
 func (s *serializeProxy) PushLayer(l gopacket.LayerType) {
-	s.layers = append(s.layers, l)
+	s.layers = append( /*@ R00, @*/ s.layers, l)
 }

@@ -221,7 +221,13 @@ func testRun(
 	inhale io.token(place)
 	inhale dp.dp3s_iospec_ordered(state, place)
 
-	d.Run(ctx, place, state, dp)
+	cfg := &RunConfig{
+		NumProcessors:         8,
+		BatchSize:             256,
+		NumSlowPathProcessors: 1,
+	}
+
+	d.Run(ctx, cfg, place, state, dp)
 }
 
 ensures b != nil && b.Mem()
