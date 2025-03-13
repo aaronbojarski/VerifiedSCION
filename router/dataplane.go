@@ -593,6 +593,8 @@ func (d *DataPlane) AddRemotePeer(local, remote uint16) error {
 }
 
 // AddExternalInterfaceBFD adds the inter AS connection BFD session.
+// @ trusted
+// @ requires false
 func (d *DataPlane) addExternalInterfaceBFD(ifID uint16,
 	src, dst control.LinkEnd, cfg control.BFD) error {
 
@@ -744,6 +746,8 @@ func (d *DataPlane) AddNextHop(ifID uint16, src, dst netip.AddrPort, cfg control
 // AddNextHopBFD adds the BFD session for the next hop address.
 // If the remote ifID belongs to an existing address, the existing
 // BFD session will be re-used.
+// @ trusted
+// @ requires false
 func (d *DataPlane) addNextHopBFD(ifID uint16, src, dst netip.AddrPort, cfg control.BFD,
 	sibling string) error {
 
@@ -985,7 +989,7 @@ func (d *DataPlane) returnPacketToPool(pkt *packet) {
 }
 
 func (d *DataPlane) runProcessor(id int, q <-chan *packet,
-	fwQs map[uint16]chan *packet, slowQ chan<- *packet) {
+	fwQs map[uint16]chan *packet, slowQ chan<- *packet /*@, ghost dp io.DataPlaneSpec @*/) {
 
 	log.Debug("Initialize processor with", "id", id)
 	processor := newPacketProcessor(d)
@@ -994,7 +998,10 @@ func (d *DataPlane) runProcessor(id int, q <-chan *packet,
 		if !ok {
 			continue
 		}
-		disp := processor.processPkt(p)
+		// TODO(aaronbojarski): Either pass these values as argument or populate them properly.
+		// @ ghost var ioLock gpointer[gsync.GhostMutex]
+		// @ ghost var ioSharedArg SharedArg
+		disp := processor.processPkt(p /*@, ioLock, ioSharedArg, dp @*/)
 
 		sc := classOfSize(len(p.rawPacket))
 		metrics := d.forwardingMetrics[p.ingress][sc]
@@ -1123,6 +1130,12 @@ func (p *slowPathPacketProcessor) processPacket(pkt *packet) error {
 	p.reset()
 	p.pkt = pkt
 
+	// TODO(aaronbojarski): Need to correctly initialize these vars. (ub is likely pkt.rawPacket ...)
+	// @ ghost var ub []byte
+	// @ ghost var ubLL []byte
+	// @ ghost var startLL int
+	// @ ghost var endLL int
+
 	// @ ghost var processed seq[bool]
 	// @ ghost var offsets   seq[offsetPair]
 	// @ ghost var lastLayerIdx int
@@ -1168,12 +1181,12 @@ func (p *slowPathPacketProcessor) processPacket(pkt *packet) error {
 			layer = &slayers.SCMPInternalConnectivityDown{IA: p.d.localIA,
 				Ingress: uint64(p.pkt.ingress), Egress: uint64(p.pkt.egress)}
 		}
-		return p.packSCMP(s.scmpType, s.code, layer, true)
+		return p.packSCMP(s.scmpType, s.code, layer, true /*@ , ub, ubLL, startLL, endLL @*/)
 
 	case slowPathRouterAlertIngress: //Traceroute
-		return p.handleSCMPTraceRouteRequest(p.pkt.ingress)
+		return p.handleSCMPTraceRouteRequest(p.pkt.ingress /*@ , ub, ubLL, startLL, endLL @*/)
 	case slowPathRouterAlertEgress: //Traceroute
-		return p.handleSCMPTraceRouteRequest(p.pkt.egress)
+		return p.handleSCMPTraceRouteRequest(p.pkt.egress /*@ , ub, ubLL, startLL, endLL @*/)
 	default:
 		panic("Unsupported slow-path type")
 	}
@@ -1323,16 +1336,21 @@ func (p *scionPacketProcessor) reset() error {
 
 // Convenience function to log an error and return the pDiscard disposition.
 // We do almost nothing with errors, so, we shouldn't invest in creating them.
+// @ trusted
+// @ requires false
 func errorDiscard(ctx ...any) disposition {
 	log.Debug("Discarding packet", ctx...)
 	return pDiscard
 }
 
-func (p *scionPacketProcessor) processPkt(pkt *packet) disposition {
+func (p *scionPacketProcessor) processPkt(pkt *packet /*@, ghost ioLock gpointer[gsync.GhostMutex], ghost ioSharedArg SharedArg, ghost dp io.DataPlaneSpec @*/) disposition {
 	if err := p.reset(); err != nil {
 		return errorDiscard("error", err)
 	}
 	p.pkt = pkt
+
+	// @ ghost llStart := 0
+	// @ ghost llEnd := len(p.pkt.rawPacket)
 
 	// parse SCION header and skip extensions;
 	var err error
@@ -1364,7 +1382,7 @@ func (p *scionPacketProcessor) processPkt(pkt *packet) disposition {
 		}
 		return p.processOHP()
 	case scion.PathType:
-		return p.processSCION( /*@ ub @*/ )
+		return p.processSCION( /*@ p.pkt.rawPacket, ub == nil, llStart, llEnd, ioLock, ioSharedArg, dp @*/ )
 	case epic.PathType:
 		return p.processEPIC( /*@ ub @*/ )
 	default:
@@ -1964,11 +1982,13 @@ func (p *scionPacketProcessor) verifyCurrentMAC( /*@ ghost dp io.DataPlaneSpec, 
 }
 
 func (p *scionPacketProcessor) resolveInbound( /*@ ghost ubScionL []byte, ghost ubLL []byte, ghost startLL int, ghost endLL int @*/ ) (disp disposition /*@ , ghost addrAliasesUb bool @*/) {
+	// TODO(aaronbojarski): check return boolean. not sure what it is for and if it is implemented correctly.
+
 	err := p.d.resolveLocalDst(p.pkt.dstAddr, p.scionLayer, p.lastLayer /*@ , ubScionL @*/)
 
 	switch err {
 	case nil:
-		return pForward
+		return pForward /*@ , false @*/
 	case noSVCBackend:
 		log.Debug("SCMP response", "cause", err)
 		p.pkt.slowPathRequest = slowPathRequest{
@@ -3000,7 +3020,7 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 	if revPath.IsXover( /*@ rawPath @*/ ) && !peering {
 		// An effective cross-over is a change of segment other than at
 		// a peering hop.
-		if err := revPath.IncPath(); err != nil {
+		if err := revPath.IncPath( /*@ ubPath @*/ ); err != nil {
 			return serrors.JoinNoStack(cannotRoute, err,
 				"details", "reverting cross over for SCMP")
 		}
@@ -3100,7 +3120,7 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 			return serrors.JoinNoStack(cannotRoute, err,
 				"details", "parsing destination address")
 		}
-		key, err := p.drkeyProvider.GetASHostKey(now, scionL.DstIA, dstA)
+		key /*@@@*/, err := p.drkeyProvider.GetASHostKey(now, scionL.DstIA, dstA)
 		if err != nil {
 			return serrors.JoinNoStack(cannotRoute, err, "details", "retrieving DRKey")
 		}
@@ -3120,6 +3140,7 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 			},
 			p.macInputBuffer,
 			p.optAuth.Authenticator(),
+			/* @ ub, @ */
 		)
 		if err != nil {
 			return serrors.JoinNoStack(cannotRoute, err, "details", "computing CMAC")
@@ -3192,7 +3213,7 @@ func (p *slowPathPacketProcessor) hasValidAuth(t time.Time /*@, ghost ub []byte 
 	if err != nil {
 		return false
 	}
-	key, err := p.drkeyProvider.GetKeyWithinAcceptanceWindow(
+	key /*@@@*/, err := p.drkeyProvider.GetKeyWithinAcceptanceWindow(
 		t,
 		authOption.TimestampSN(),
 		p.scionLayer.SrcIA,
@@ -3203,16 +3224,18 @@ func (p *slowPathPacketProcessor) hasValidAuth(t time.Time /*@, ghost ub []byte 
 		return false
 	}
 
+	data /*@ , start, end @*/ := p.lastLayer.LayerPayload( /*@ ub @*/ )
 	_, err = spao.ComputeAuthCMAC(
 		spao.MACInput{
 			Key:        key.Key[:],
 			Header:     authOption,
 			ScionLayer: &p.scionLayer,
 			PldType:    slayers.L4SCMP,
-			Pld:        p.lastLayer.LayerPayload( /*@ ub @*/ ),
+			Pld:        data,
 		},
 		p.macInputBuffer,
 		p.validAuthBuf,
+		/*@ ub, @*/
 	)
 	if err != nil {
 		return false
