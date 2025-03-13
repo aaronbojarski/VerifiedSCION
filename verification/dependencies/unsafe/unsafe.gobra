@@ -13,8 +13,6 @@ Go 1 compatibility guidelines.
 
 package unsafe
 
-type ArbitraryType int
-
 // Sizeof takes an expression x of any type and returns the size in bytes
 // of a hypothetical variable v as if v was declared via var v = x.
 // The size does not include any memory possibly referenced by x.
@@ -28,4 +26,4 @@ type ArbitraryType int
 // (A type has variable size if it is a type parameter or if it is an array
 // or struct type with elements of variable size).
 decreases
-func Sizeof(x ArbitraryType) uintptr
+func Sizeof(x interface{}) (ret uintptr)

@@ -94,10 +94,8 @@ const (
 	e2eAuthHdrLen = 32
 
 	// Needed to compute required padding
-	// TODO(aaronbojarski): add back when unsafe.Sizeof is speced
-	//ptrSize = unsafe.Sizeof(&struct{ int }{})
-	//is32bit = 1 - (ptrSize-4)/4
-	is32bit = 0
+	// (VerifiedSCION): rewrote this, since gobra does not like function calls in const definitions.
+	is32bit = 1 - (uint64(^uintptr(0)) / ^uint64(0))
 )
 
 // (VerifiedSCION) acc(Mem(), _) is enough to call every method, given that
@@ -240,7 +238,7 @@ type slowPathRequest struct {
 }
 
 // Make sure that the packet structure has the size we expect.
-// TODO(aaronbojarski): uncomment this once we figured out how to spec unsafe.Sizeof
+// TODO(aaronbojarski): Gobra does not like function call in const definition. Not sure what to do here.
 // const _ uintptr = 64 - unsafe.Sizeof(packet{}) // assert 64 >= sizeof(packet)
 // const _ uintptr = unsafe.Sizeof(packet{}) - 64 // assert sizeof(packet) >= 64
 
@@ -794,6 +792,8 @@ type RunConfig struct {
 }
 
 func (d *DataPlane) Run(ctx context.Context, cfg *RunConfig /*@, ghost place io.Place, ghost state io.IO_dp3s_state_local, ghost dp io.DataPlaneSpec @*/) error {
+	// @ share d, ctx, cfg, dp
+
 	d.mtx.Lock()
 	d.initMetrics()
 
@@ -802,40 +802,45 @@ func (d *DataPlane) Run(ctx context.Context, cfg *RunConfig /*@, ghost place io.
 		cfg.BatchSize)
 
 	d.initPacketPool(cfg, processorQueueSize)
-	procQs, fwQs, slowQs := initQueues(cfg, d.interfaces, processorQueueSize)
+	procQs /*@@@*/, fwQs /*@@@*/, slowQs /*@@@*/ := initQueues(cfg, d.interfaces, processorQueueSize)
 	d.fwQs = fwQs // Shared with BFD senders
 
 	d.setRunning()
 	for ifID, conn := range d.interfaces {
-		go func(ifID uint16, conn BatchConn) {
+		clReceive := func /*@ closure1 @*/ (ifID uint16, conn BatchConn) {
 			defer log.HandlePanic()
 			d.runReceiver(ifID, conn, cfg, procQs)
-		}(ifID, conn)
-		go func(ifID uint16, conn BatchConn) {
+		}
+		go clReceive(ifID, conn) //@ as closure1
+		clForward := func /*@ closure2 @*/ (ifID uint16, conn BatchConn) {
 			defer log.HandlePanic()
 			d.runForwarder(ifID, conn, cfg, fwQs[ifID])
-		}(ifID, conn)
+		}
+		go clForward(ifID, conn) //@ as closure2
 	}
 	for i := 0; i < cfg.NumProcessors; i++ {
-		go func(i int) {
+		cl := func /*@ closure3 @*/ (i int) {
 			defer log.HandlePanic()
-			d.runProcessor(i, procQs[i], fwQs, slowQs[i%cfg.NumSlowPathProcessors])
-		}(i)
+			d.runProcessor(i, procQs[i], fwQs, slowQs[i%cfg.NumSlowPathProcessors] /*@, dp @*/)
+		}
+		go cl(i) //@ as closure3
 	}
 	for i := 0; i < cfg.NumSlowPathProcessors; i++ {
-		go func(i int) {
+		cl := func /*@ closure4 @*/ (i int) {
 			defer log.HandlePanic()
 			d.runSlowPathProcessor(i, slowQs[i], fwQs)
-		}(i)
+		}
+		go cl(i) //@ as closure4
 	}
 
 	for k, v := range d.bfdSessions {
-		go func(ifID uint16, c bfdSession) {
+		cl := func /*@ closure5 @*/ (ifID uint16, c bfdSession) {
 			defer log.HandlePanic()
 			if err := c.Run(ctx); err != nil && err != bfd.AlreadyRunning {
 				log.Error("BFD session failed to start", "ifID", ifID, "err", err)
 			}
-		}(k, v)
+		}
+		go cl(k, v) //@ as closure5
 	}
 
 	d.mtx.Unlock()
@@ -880,12 +885,13 @@ func initQueues(cfg *RunConfig, interfaces map[uint16]BatchConn,
 
 func (d *DataPlane) runReceiver(ifID uint16, conn BatchConn, cfg *RunConfig,
 	procQs []chan *packet) {
+	// @ share d, ifID, cfg, procQs
 
 	log.Debug("Run receiver for", "interface", ifID)
 
 	// Each receiver (therefore each input interface) has a unique random seed for the procID hash
 	// function.
-	hashSeed := fnv1aOffset32
+	hashSeed /*@@@*/ := fnv1aOffset32
 	randomBytes := make([]byte, 4)
 	if _, err := rand.Read(randomBytes); err != nil {
 		panic("Error while generating random value")
@@ -902,10 +908,10 @@ func (d *DataPlane) runReceiver(ifID uint16, conn BatchConn, cfg *RunConfig,
 	// The packet owns the buffer that we set in the matching msg, plus the metadata that we'll add.
 	packets := make([]*packet, cfg.BatchSize)
 
-	numReusable := 0                     // unused buffers from previous loop
-	metrics := d.forwardingMetrics[ifID] // If receiver exists, fw metrics exist too.
+	numReusable := 0                             // unused buffers from previous loop
+	metrics /*@@@*/ := d.forwardingMetrics[ifID] // If receiver exists, fw metrics exist too.
 
-	enqueueForProcessing := func(size int, srcAddr *net.UDPAddr, pkt *packet) {
+	enqueueForProcessing := func /*@ clEnqueueForProcessing @*/ (size int, srcAddr *net.UDPAddr, pkt *packet) {
 		sc := classOfSize(size)
 		metrics[sc].InputPacketsTotal.Inc()
 		metrics[sc].InputBytesTotal.Add(float64(size))
@@ -948,7 +954,7 @@ func (d *DataPlane) runReceiver(ifID uint16, conn BatchConn, cfg *RunConfig,
 			continue
 		}
 		for i, msg := range msgs[:numPkts] {
-			enqueueForProcessing(msg.N, msg.Addr.(*net.UDPAddr), packets[i])
+			enqueueForProcessing(msg.N, msg.Addr.(*net.UDPAddr), packets[i]) //@ as clEnqueueForProcessing
 		}
 	}
 }
