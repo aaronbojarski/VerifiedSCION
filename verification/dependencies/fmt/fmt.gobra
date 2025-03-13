@@ -28,6 +28,9 @@ func Sprintf(format string, v ...interface{}) string
 decreases _
 func Sprint(a ...any) string
 
+decreases _
+func Errorf(format string, a ...any) error
+
 type Stringer interface {
 	pred Mem()
 
