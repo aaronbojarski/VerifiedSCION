@@ -52,7 +52,7 @@ func (u *UDP) NextLayerType() gopacket.LayerType {
 	return gopacket.LayerTypePayload
 }
 
-func (u *UDP) TransportFlow() gopacket.Flow {
+func (u *UDP) TransportFlow( /*@ ghost ub []byte @*/ ) gopacket.Flow {
 	return gopacket.NewFlow(EndpointUDPPort, u.sPort, u.dPort)
 }
 

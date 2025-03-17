@@ -2783,6 +2783,8 @@ func getDstPortSCMP(scmp *slayers.SCMP /*@, ghost ub []byte @*/) (uint16, error)
 }
 
 // decodeSCMP decodes the SCMP payload. WARNING: Decoding is done with NoCopy set.
+// @ trusted
+// @ requires false
 func decodeSCMP(scmp *slayers.SCMP /*@, ghost ub []byte @*/) ([]gopacket.SerializableLayer, error) {
 	gpkt := gopacket.NewPacket(scmp.Payload, scmp.NextLayerType( /*@ ub @*/ ),
 		gopacket.DecodeOptions{NoCopy: true})
@@ -2808,6 +2810,7 @@ func decodeSCMP(scmp *slayers.SCMP /*@, ghost ub []byte @*/) ([]gopacket.Seriali
 // function to replace a header with a smaller one; but the rawPacket's slice must be fixed
 // afterwards (and the preceding headers, if any).
 func updateSCIONLayer(rawPkt []byte, s slayers.SCION) error {
+	// @ share s
 	// @ ghost var start int
 	// @ ghost var end int
 	data /*@, start, end @*/ := s.LayerPayload( /*@ rawPkt @*/ )
@@ -2815,7 +2818,7 @@ func updateSCIONLayer(rawPkt []byte, s slayers.SCION) error {
 
 	// Prepends must go just before payload. (and any Append will wreck it)
 	serBuf /*@@@*/ := newSerializeProxyStart(rawPkt, payloadOffset)
-	return s.SerializeTo(&serBuf, gopacket.SerializeOptions{})
+	return s.SerializeTo(&serBuf, gopacket.SerializeOptions{} /*@, rawPkt @*/)
 }
 
 type bfdSend struct {
@@ -3111,7 +3114,7 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 	// to the end of the buffer (go supports overlaps properly).
 	// TODO(jiceatscion): in the future we may be able to leave room at the head of the
 	// buffer on ingest, so we won't need to move the quote at all.
-	err = gopacket.SerializeLayers(&serBuf, sopts, &scmpH, scmpP, gopacket.Payload(quote))
+	err = gopacket.SerializeLayers(&serBuf, sopts /*@ , nil @*/, &scmpH, scmpP, gopacket.Payload(quote))
 	if err != nil {
 		return serrors.JoinNoStack(cannotRoute, err, "details", "serializing SCMP message")
 	}
