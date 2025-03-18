@@ -470,7 +470,7 @@ func (d *DataPlane) AddInternalInterface(conn BatchConn, ip netip.Addr) error {
 	}
 	if d.interfaces == nil {
 		d.interfaces = make(map[uint16]BatchConn)
-	} else if d.interfaces[0] != nil {
+	} else if tmp := d.interfaces[0]; tmp != nil /* (VerifiedSCION) added tmp variable to help gobra with map representation */ {
 		return alreadySet
 	}
 	d.interfaces[0] = conn
