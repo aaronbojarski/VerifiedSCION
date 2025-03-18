@@ -52,12 +52,16 @@ func (u *UDP) NextLayerType() gopacket.LayerType {
 	return gopacket.LayerTypePayload
 }
 
+// @ trusted
+// @ requires false
 func (u *UDP) TransportFlow( /*@ ghost ub []byte @*/ ) gopacket.Flow {
 	return gopacket.NewFlow(EndpointUDPPort, u.sPort, u.dPort)
 }
 
 // DecodeFromBytes implements the gopacket.DecodingLayer.DecodeFromBytes method.
 // This implementation is copied from gopacket/layers/udp.go.
+// @ trusted
+// @ requires false
 func (u *UDP) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	if len(data) < 8 {
 		df.SetTruncated()
@@ -86,6 +90,8 @@ func (u *UDP) DecodeFromBytes(data []byte, df gopacket.DecodeFeedback) error {
 	return nil
 }
 
+// @ trusted
+// @ requires false
 func (u *UDP) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOptions) error {
 	bytes, err := b.PrependBytes(8)
 	if err != nil {
@@ -113,6 +119,8 @@ func (u *UDP) SerializeTo(b gopacket.SerializeBuffer, opts gopacket.SerializeOpt
 	return nil
 }
 
+// @ trusted
+// @ requires false
 func (u *UDP) fixLengths(length int) {
 	if length > 65535 {
 		u.Length = 0
@@ -121,14 +129,20 @@ func (u *UDP) fixLengths(length int) {
 	u.Length = uint16(length)
 }
 
+// @ trusted
+// @ requires false
 func (u *UDP) SetNetworkLayerForChecksum(scn *SCION) {
 	u.scn = scn
 }
 
+// @ trusted
+// @ requires false
 func (u *UDP) String() string {
 	return fmt.Sprintf("SrcPort=%d, DstPort=%d", u.SrcPort, u.DstPort)
 }
 
+// @ trusted
+// @ requires false
 func decodeSCIONUDP(data []byte, pb gopacket.PacketBuilder) error {
 	u := &UDP{}
 	err := u.DecodeFromBytes(data, pb)
