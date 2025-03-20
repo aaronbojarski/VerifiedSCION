@@ -245,7 +245,8 @@ type slowPathRequest struct {
 // initPacket configures the given blank packet (and returns it, for convenience).
 func (p *packet) init(buffer *[bufSize]byte) *packet {
 	p.buffer = buffer
-	p.rawPacket = p.buffer[:]
+	// (VerifiedSCION) Gobra does not automatically dereference p.buffer. Therefore the dereferencing was addid here manually.
+	p.rawPacket = (*p.buffer)[:]
 	p.dstAddr = &net.UDPAddr{IP: make(net.IP, net.IPv6len)}
 	return p
 }
@@ -254,10 +255,11 @@ func (p *packet) init(buffer *[bufSize]byte) *packet {
 // A cleared dstAddr is represented with a zero-length IP so we keep reusing the IP storage bytes.
 func (p *packet) reset() {
 	p.dstAddr.IP = p.dstAddr.IP[0:0] // We're keeping the object, just blank it.
+	// (VerifiedSCION) Gobra does not automatically dereference p.buffer. Therefore the dereferencing was addid here manually.
 	*p = packet{
-		buffer:    p.buffer,    // keep the buffer
-		rawPacket: p.buffer[:], // restore the full packet capacity
-		dstAddr:   p.dstAddr,   // keep the dstAddr and so the IP slice and bytes
+		buffer:    p.buffer,       // keep the buffer
+		rawPacket: (*p.buffer)[:], // restore the full packet capacity
+		dstAddr:   p.dstAddr,      // keep the dstAddr and so the IP slice and bytes
 	}
 	// Everything else is reset to zero value.
 }
