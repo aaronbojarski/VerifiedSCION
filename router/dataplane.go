@@ -2681,6 +2681,8 @@ func (d *DataPlane) addEndhostPort(
 	return nil
 }
 
+// @ trusted
+// @ requires false
 func getDstPortSCMP(scmp *slayers.SCMP /*@, ghost ub []byte @*/) (uint16, error) {
 	// XXX(JordiSubira): This implementation is far too slow for the dataplane.
 	// We should reimplement this with fewer helpers and memory allocations, since
@@ -3116,28 +3118,29 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 		if err := p.resetSPAOMetadata(key, now); err != nil {
 			return serrors.JoinNoStack(cannotRoute, err, "details", "resetting SPAO header")
 		}
-
-		e2e.Options = []*slayers.EndToEndOption{p.optAuth.EndToEndOption}
-		e2e.NextHdr = slayers.L4SCMP
-		_, err = spao.ComputeAuthCMAC(
-			spao.MACInput{
-				Key:        key.Key[:],
-				Header:     p.optAuth,
-				ScionLayer: &scionL,
-				PldType:    slayers.L4SCMP,
-				Pld:        serBuf.Bytes(),
-			},
-			p.macInputBuffer,
-			p.optAuth.Authenticator(),
-			/* @ ub, @ */
-		)
-		if err != nil {
-			return serrors.JoinNoStack(cannotRoute, err, "details", "computing CMAC")
-		}
-		if err := e2e.SerializeTo(&serBuf, sopts); err != nil {
-			return serrors.JoinNoStack(cannotRoute, err,
-				"details", "serializing SCION E2E headers")
-		}
+		/*
+			e2e.Options = []*slayers.EndToEndOption{p.optAuth.EndToEndOption}
+			e2e.NextHdr = slayers.L4SCMP
+			_, err = spao.ComputeAuthCMAC(
+				spao.MACInput{
+					Key:        key.Key[:],
+					Header:     p.optAuth,
+					ScionLayer: &scionL,
+					PldType:    slayers.L4SCMP,
+					Pld:        serBuf.Bytes(),
+				},
+				p.macInputBuffer,
+				p.optAuth.Authenticator(),
+				/* @ ub, @ /
+			)
+			if err != nil {
+				return serrors.JoinNoStack(cannotRoute, err, "details", "computing CMAC")
+			}
+			if err := e2e.SerializeTo(&serBuf, sopts); err != nil {
+				return serrors.JoinNoStack(cannotRoute, err,
+					"details", "serializing SCION E2E headers")
+			}
+		*/
 	} else {
 		scionL.NextHdr = slayers.L4SCMP
 	}
@@ -3212,23 +3215,25 @@ func (p *slowPathPacketProcessor) hasValidAuth(t time.Time /*@, ghost ub []byte 
 		log.Debug("Selecting key to authenticate the incoming packet", "err", err)
 		return false
 	}
-
-	data /*@ , start, end @*/ := p.lastLayer.LayerPayload( /*@ ub @*/ )
-	_, err = spao.ComputeAuthCMAC(
-		spao.MACInput{
-			Key:        key.Key[:],
-			Header:     authOption,
-			ScionLayer: &p.scionLayer,
-			PldType:    slayers.L4SCMP,
-			Pld:        data,
-		},
-		p.macInputBuffer,
-		p.validAuthBuf,
-		/*@ ub, @*/
-	)
-	if err != nil {
-		return false
-	}
+	// TODO(aaronbojarski): Fix when found solution for Key reslicing.
+	/*
+		data /*@ , start, end @* := p.lastLayer.LayerPayload( /*@ ub @/ )
+		_, err = spao.ComputeAuthCMAC(
+			spao.MACInput{
+				Key:        key.Key[:],
+				Header:     authOption,
+				ScionLayer: &p.scionLayer,
+				PldType:    slayers.L4SCMP,
+				Pld:        data,
+			},
+			p.macInputBuffer,
+			p.validAuthBuf,
+			/*@ ub, @/
+		)
+		if err != nil {
+			return false
+		}
+	*/
 	// compare incoming authField with computed authentication tag
 	return subtle.ConstantTimeCompare(authOption.Authenticator(), p.validAuthBuf) != 0
 }

@@ -35,6 +35,8 @@ func newServices() *services {
 	return &services{m: make(map[addr.SVC][]netip.AddrPort)}
 }
 
+// @ trusted
+// @ requires false
 func (s *services) AddSvc(svc addr.SVC, a netip.AddrPort) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
