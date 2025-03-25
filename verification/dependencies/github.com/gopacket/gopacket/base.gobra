@@ -35,6 +35,8 @@ type Payload []byte
 
 pred (p Payload) Mem(ub []byte) { ub === p }
 
+pred (p *Payload) Mem(ub []byte) { ub === *p }
+
 decreases
 pure func (p Payload) LayerType() LayerType {
 	return LayerTypePayload
