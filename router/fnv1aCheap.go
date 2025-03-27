@@ -19,7 +19,6 @@ package router
 // fnv1aOffset32 is an initial offset that can be used as initial state when calling
 // hashFNV1a.
 const fnv1aOffset32 uint32 = 2166136261
-const prime32 = 16777619
 
 // hashFNV1a returns a hash value for the given initial state combined with the given byte.
 // To get a hash for a sequence of bytes, invoke for each byte, passing the returned value
@@ -27,5 +26,9 @@ const prime32 = 16777619
 // s2 = hashFNV1a(s1, byte2) etc. It is valid and recommended to use a value obtained
 // from calla to hashFNV1a() as the initial state rather than fnv1aOffset32 itself.
 func hashFNV1a(state uint32, c byte) uint32 {
+	// (VerifiedSCION): made prime32 a var since gobra does not support const definitions within functions.
+	// Half the permission is immediately exhaled, so it is in essence a const.
+	var prime32 /*@@@*/ uint32 = 16777619
+	// @ exhale acc(&prime32, 1/2)
 	return (state ^ uint32(c)) * prime32
 }
