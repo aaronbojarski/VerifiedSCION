@@ -823,7 +823,9 @@ func (d *DataPlane) Run(ctx context.Context, cfg *RunConfig /*@, ghost place io.
 	for i := 0; i < cfg.NumProcessors; i++ {
 		cl := func /*@ closure3 @*/ (i int) {
 			defer log.HandlePanic()
-			d.runProcessor(i, procQs[i], fwQs, slowQs[i%cfg.NumSlowPathProcessors] /*@, dp @*/)
+			procQ /*@@@*/ := procQs[i]
+			slowQ /*@@@*/ := slowQs[i%cfg.NumSlowPathProcessors]
+			d.runProcessor(i, procQ, fwQs, slowQ /*@, dp @*/)
 		}
 		go cl(i) //@ as closure3
 	}
