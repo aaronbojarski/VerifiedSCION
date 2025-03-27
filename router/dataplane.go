@@ -932,9 +932,15 @@ func (d *DataPlane) runReceiver(ifID uint16, conn BatchConn, cfg *RunConfig,
 		pkt.ingress = ifID
 		pkt.srcAddr = srcAddr
 		// TODO(aaronbojarski): change this once gobra understands select statement.
-
-		procQs[procID] <- pkt
-
+		// @ trusted
+		// @ outline(
+		select {
+		case procQs[procID] <- pkt:
+		default:
+			d.returnPacketToPool(pkt)
+			metrics[sc].DroppedPacketsBusyProcessor.Inc()
+		}
+		// @ )
 	}
 
 	for d.IsRunning() {
@@ -1020,8 +1026,16 @@ func (d *DataPlane) runProcessor(id int, q <-chan *packet,
 			// Normal processing proceeds.
 		case pSlowPath:
 			// Not an error, processing continues on the slow path.
-			// TODO(aaronbojarski): change this once gobra understands select statement.
-			slowQ <- p
+			// TODO(aaronbojarski): remove the outline once gobra understands select statement.
+			// @ trusted
+			// @ outline (
+			select {
+			case slowQ <- p:
+			default:
+				metrics.DroppedPacketsBusySlowPath.Inc()
+				d.returnPacketToPool(p)
+			}
+			// @ )
 			continue
 		case pDone: // Packets that don't need more processing (e.g. BFD)
 			d.returnPacketToPool(p)
@@ -1042,8 +1056,16 @@ func (d *DataPlane) runProcessor(id int, q <-chan *packet,
 			d.returnPacketToPool(p)
 			continue
 		}
-		// TODO(aaronbojarski): change this once gobra understands select statement.
-		fwCh <- p
+		// TODO(aaronbojarski): remove the outline once gobra understands select statement.
+		// @ trusted
+		// @ outline (
+		select {
+		case fwCh <- p:
+		default:
+			d.returnPacketToPool(p)
+			metrics.DroppedPacketsBusyForwarder.Inc()
+		}
+		// @ )
 	}
 }
 
@@ -1072,8 +1094,15 @@ func (d *DataPlane) runSlowPathProcessor(id int, q <-chan *packet,
 			d.returnPacketToPool(p)
 			continue
 		}
-		// TODO(aaronbojarski): change this once gobra understands select statement.
-		fwCh <- p
+		// TODO(aaronbojarski): remove the outline once gobra understands select statement.
+		// @ trusted
+		// @ outline (
+		select {
+		case fwCh <- p:
+		default:
+			d.returnPacketToPool(p)
+		}
+		// @ )
 	}
 }
 
@@ -1279,15 +1308,21 @@ func readUpTo(c <-chan *packet, n int, needsBlocking bool, pkts []*packet) int {
 		pkts[i] = p
 		i++
 	}
-
+	// TODO(aaronbojarski): remove the outline once gobra understands select statement and reintroduce return statements (have been replaced by break).
+	// @ trusted
+	// @ outline (
 	for ; i < n; i++ {
-		// TODO(aaronbojarski): change this once gobra understands select statement.
-		p, ok := <-c
-		if !ok {
-			return i
+		select {
+		case p, ok := <-c:
+			if !ok {
+				break
+			}
+			pkts[i] = p
+		default:
+			break
 		}
-		pkts[i] = p
 	}
+	// @ )
 	return i
 }
 
@@ -1979,9 +2014,9 @@ func (p *scionPacketProcessor) resolveInbound( /*@ ghost ubScionL []byte, ghost 
 	err := p.d.resolveLocalDst(p.pkt.dstAddr, p.scionLayer, p.lastLayer /*@ , ubScionL @*/)
 
 	switch err {
-	// TODO(aaronbojarski): change this once gobra can have nil in switch statement.
-	//case nil:
-	//	return pForward /*@ , false @*/
+	// (VerifiedSCION): Added cast to error to help gobra.
+	case /*@(error)(@*/ nil /*@)@*/ :
+		return pForward /*@ , false @*/
 	case noSVCBackend:
 		log.Debug("SCMP response", "cause", err)
 		p.pkt.slowPathRequest = slowPathRequest{
@@ -2930,8 +2965,17 @@ func (b *bfdSend) Send(bfd *layers.BFD) error {
 		updateNetAddrFromAddrPort(p.dstAddr, b.dstAddr)
 	}
 	// No need to specify pkt.egress. It isn't used downstream from here.
-	// TODO(aaronbojarski): change this once gobra understands select statement.
-	fwChan <- p
+	// TODO(aaronbojarski): remove outline once gobra understands select statement.
+	// @ trusted
+	// @ outline (
+	select {
+	case fwChan <- p:
+	default:
+		// We do not care if some BFD packets get bounced under high load. If it becomes a problem,
+		// the solution is do use BFD's demand-mode. To be considered in a future refactoring.
+		b.dataPlane.returnPacketToPool(p)
+	}
+	// @ )
 	return err
 }
 
@@ -3218,24 +3262,27 @@ func (p *slowPathPacketProcessor) hasValidAuth(t time.Time /*@, ghost ub []byte 
 		return false
 	}
 	// TODO(aaronbojarski): Fix when found solution for Key reslicing.
-	/*
-		data /*@ , start, end @* := p.lastLayer.LayerPayload( /*@ ub @/ )
-		_, err = spao.ComputeAuthCMAC(
-			spao.MACInput{
-				Key:        key.Key[:],
-				Header:     authOption,
-				ScionLayer: &p.scionLayer,
-				PldType:    slayers.L4SCMP,
-				Pld:        data,
-			},
-			p.macInputBuffer,
-			p.validAuthBuf,
-			/*@ ub, @/
-		)
-		if err != nil {
-			return false
-		}
-	*/
+	// @ trusted
+	// @ outline (
+	data /*@ , start, end @*/ := p.lastLayer.LayerPayload( /*@ ub @*/ )
+	_, err = spao.ComputeAuthCMAC(
+		spao.MACInput{
+			Key:        key.Key[:],
+			Header:     authOption,
+			ScionLayer: &p.scionLayer,
+			PldType:    slayers.L4SCMP,
+			Pld:        data,
+		},
+		p.macInputBuffer,
+		p.validAuthBuf,
+		/*@ ub, @*/
+	)
+	// @ )
+
+	if err != nil {
+		return false
+	}
+
 	// compare incoming authField with computed authentication tag
 	return subtle.ConstantTimeCompare(authOption.Authenticator(), p.validAuthBuf) != 0
 }
