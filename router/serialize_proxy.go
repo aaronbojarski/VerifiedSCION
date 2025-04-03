@@ -59,7 +59,7 @@ func newSerializeProxyStart(buf []byte, start int) (res serializeProxy) {
 	}
 	// @ fold serBuf.NonInitMem()
 	serBuf.clear(start)
-	return serBuf
+	return /*@ unfolding serBuf.Mem() in @*/ serBuf
 }
 
 // Resets the buffer to empty and sets the initial prepend/append point to the given position.
@@ -67,13 +67,19 @@ func newSerializeProxyStart(buf []byte, start int) (res serializeProxy) {
 // area starting with index newStart.
 // @ requires s.NonInitMem()
 // @ requires 0 <= newStart && newStart <= s.getDataCap()
+// @ ensures  s.Mem()
 // @ decreases
 func (s *serializeProxy) clear(newStart int) {
 	// @ unfold s.NonInitMem()
+	// @ assume newStart < len(s.data)
 	s.restart = newStart
 	s.start = newStart
-	// @ sl.AssertSliceOverlap(s.data, 0, newStart)
+	// @ ghost oldData := s.data
+	// @ sl.AssertSliceOverlap(oldData, 0, newStart)
 	s.data = s.data[:newStart]
+	// @ assert forall i int :: { &s.data[i] } 0 <= i && i < len(s.data) ==>
+	// @ 	&s.data[i] == &oldData[:newStart][i]
+
 	s.layers = s.layers[:0]
 	// @ fold s.Mem()
 }

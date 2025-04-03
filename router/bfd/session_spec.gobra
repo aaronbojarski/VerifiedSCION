@@ -164,7 +164,6 @@ type Session struct {
 	testLogger log.Logger
 }
 
-// TODO(aaronbojarski): make sure this is enough
 pred (s *Session) Mem() {
     acc(s)
 }

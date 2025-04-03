@@ -154,7 +154,7 @@ type BatchConn interface {
 	//  ensures   err == nil ==>
 	//  	forall i int :: { &msgs[i] } 0 <= i && i < n ==>
 	//  		MsgToAbsVal(&msgs[i], ingressID) == old(MultiReadBioIO_val(place, n)[i])
-	// TODO(aaronbojarski): add ghost parameters again once actually verifying the function.
+	// TODO(VerifiedSCION): add ghost parameters and IO contracts again once actually verifying the function.
 	ReadBatch(msgs underlayconn.Messages /*, ghost ingressID uint16, ghost prophecyM int, ghost place io.Place */) (n int, err error)
 
 	// @ requires  acc(Mem(), _)
@@ -174,7 +174,7 @@ type BatchConn interface {
 	// (VerifiedSCION) the permission to the protocol must always be returned,
 	// otherwise the router cannot continue after failing to send a packet.
 	// ensures   io.token(old(io.dp3s_iospec_bio3s_send_T(place, ioAbsPkts)))
-	// TODO(aaronbojarski): add ghost parameters again once actually verifying the function.
+	// TODO(VerifiedSCION): add ghost parameters and IO contracts again once actually verifying the function.
 	WriteBatch(msgs underlayconn.Messages, flags int /*, ghost egressID uint16, ghost place io.Place, ghost ioAbsPkts io.IO_val */) (n int, err error)
 
 	// @ requires Mem()
@@ -238,7 +238,7 @@ type slowPathRequest struct {
 }
 
 // Make sure that the packet structure has the size we expect.
-// TODO(aaronbojarski): Gobra does not like function call in const definition. Not sure what to do here.
+// TODO(VerifiedSCION): Gobra does not like function call in const definition. Not sure what to do here.
 // const _ uintptr = 64 - unsafe.Sizeof(packet{}) // assert 64 >= sizeof(packet)
 // const _ uintptr = unsafe.Sizeof(packet{}) - 64 // assert sizeof(packet) >= 64
 
@@ -247,8 +247,7 @@ type slowPathRequest struct {
 // @ decreases
 func (p *packet) init(buffer *[bufSize]byte) *packet {
 	p.buffer = buffer
-	// (VerifiedSCION) Gobra does not automatically dereference p.buffer. Therefore the dereferencing was addid here manually.
-	p.rawPacket = (*p.buffer)[:]
+	p.rawPacket = p.buffer[:]
 	p.dstAddr = &net.UDPAddr{IP: make(net.IP, net.IPv6len)}
 	return p
 }
@@ -259,11 +258,10 @@ func (p *packet) init(buffer *[bufSize]byte) *packet {
 // @ decreases
 func (p *packet) reset() {
 	p.dstAddr.IP = p.dstAddr.IP[0:0] // We're keeping the object, just blank it.
-	// (VerifiedSCION) Gobra does not automatically dereference p.buffer. Therefore the dereferencing was addid here manually.
 	*p = packet{
-		buffer:    p.buffer,       // keep the buffer
-		rawPacket: (*p.buffer)[:], // restore the full packet capacity
-		dstAddr:   p.dstAddr,      // keep the dstAddr and so the IP slice and bytes
+		buffer:    p.buffer,    // keep the buffer
+		rawPacket: p.buffer[:], // restore the full packet capacity
+		dstAddr:   p.dstAddr,   // keep the dstAddr and so the IP slice and bytes
 	}
 	// Everything else is reset to zero value.
 }
@@ -946,7 +944,7 @@ func (d *DataPlane) runReceiver(ifID uint16, conn BatchConn, cfg *RunConfig,
 		pkt.rawPacket = pkt.rawPacket[:size] // Update size; readBatch does not.
 		pkt.ingress = ifID
 		pkt.srcAddr = srcAddr
-		// TODO(aaronbojarski): change this once gobra understands select statement.
+		// TODO(VerifiedSCION): Uncomment this once gobra understands the select statement.
 		/*
 			select {
 			case procQs[procID] <- pkt:
@@ -1026,7 +1024,7 @@ func (d *DataPlane) runProcessor(id int, q <-chan *packet,
 		if !ok {
 			continue
 		}
-		// TODO(aaronbojarski): Either pass these values as argument or populate them properly.
+		// TODO(VerifiedSCION): Either pass these values as argument or populate them properly.
 		// @ ghost var ioLock gpointer[gsync.GhostMutex]
 		// @ ghost var ioSharedArg SharedArg
 		disp := processor.processPkt(p /*@, ioLock, ioSharedArg, dp @*/)
@@ -1040,7 +1038,7 @@ func (d *DataPlane) runProcessor(id int, q <-chan *packet,
 			// Normal processing proceeds.
 		case pSlowPath:
 			// Not an error, processing continues on the slow path.
-			// TODO(aaronbojarski): remove the outline once gobra understands select statement.
+			// TODO(VerifiedSCION): remove the outline once gobra understands select statement.
 			// @ trusted
 			// @ outline (
 			select {
@@ -1070,7 +1068,7 @@ func (d *DataPlane) runProcessor(id int, q <-chan *packet,
 			d.returnPacketToPool(p)
 			continue
 		}
-		// TODO(aaronbojarski): remove the outline once gobra understands select statement.
+		// TODO(VerifiedSCION): remove the outline once gobra understands select statement.
 		// @ trusted
 		// @ outline (
 		select {
@@ -1108,7 +1106,7 @@ func (d *DataPlane) runSlowPathProcessor(id int, q <-chan *packet,
 			d.returnPacketToPool(p)
 			continue
 		}
-		// TODO(aaronbojarski): remove the outline once gobra understands select statement.
+		// TODO(VerifiedSCION): remove the outline once gobra understands select statement.
 		// @ trusted
 		// @ outline (
 		select {
@@ -1169,7 +1167,7 @@ func (p *slowPathPacketProcessor) processPacket(pkt *packet) error {
 	p.reset()
 	p.pkt = pkt
 
-	// TODO(aaronbojarski): Need to correctly initialize these vars. (ub is likely pkt.rawPacket ...)
+	// TODO(VerifiedSCION): Need to correctly initialize these vars. (ub is likely pkt.rawPacket ...)
 	// @ ghost var ub []byte
 	// @ ghost var ubLL []byte
 	// @ ghost var startLL int
@@ -1322,7 +1320,7 @@ func readUpTo(c <-chan *packet, n int, needsBlocking bool, pkts []*packet) int {
 		pkts[i] = p
 		i++
 	}
-	// TODO(aaronbojarski): remove the outline once gobra understands select statement and reintroduce return statements (have been replaced by break).
+	// TODO(VerifiedSCION): remove the outline once gobra understands select statement and reintroduce return statements (have been replaced by break).
 	// @ trusted
 	// @ outline (
 	for ; i < n; i++ {
@@ -2023,7 +2021,7 @@ func (p *scionPacketProcessor) verifyCurrentMAC( /*@ ghost dp io.DataPlaneSpec, 
 }
 
 func (p *scionPacketProcessor) resolveInbound( /*@ ghost ubScionL []byte, ghost ubLL []byte, ghost startLL int, ghost endLL int @*/ ) (disp disposition /*@ , ghost addrAliasesUb bool @*/) {
-	// TODO(aaronbojarski): check return boolean. not sure what it is for and if it is implemented correctly.
+	// TODO(VerifiedSCION): make sure addrAliasesUb is set correctly if it is still needed
 
 	err := p.d.resolveLocalDst(p.pkt.dstAddr, p.scionLayer, p.lastLayer /*@ , ubScionL @*/)
 
@@ -2425,7 +2423,7 @@ func (p *scionPacketProcessor) process(
 	}
 	// @ ghost var oldPkt io.IO_pkt2
 	// @ ghost if(slayers.IsSupportedPkt(ub)) {
-	// TODO(aaronbojarski): add IO operations again. Not sure yet what ingressID we have, as it is no longer a parameter.
+	// 		TODO(VerifiedSCION): add IO operations again. Not sure yet what ingressID we have, as it is no longer a parameter.
 	//  	absIO_valLemma(ub, p.ingressID)
 	//  	oldPkt = absIO_val(ub, p.ingressID).IO_val_Pkt2_2
 	// @ } else {
@@ -2979,7 +2977,7 @@ func (b *bfdSend) Send(bfd *layers.BFD) error {
 		updateNetAddrFromAddrPort(p.dstAddr, b.dstAddr)
 	}
 	// No need to specify pkt.egress. It isn't used downstream from here.
-	// TODO(aaronbojarski): remove outline once gobra understands select statement.
+	// TODO(VerifiedSCION): remove outline once gobra understands select statement.
 	// @ trusted
 	// @ outline (
 	select {
@@ -3275,7 +3273,7 @@ func (p *slowPathPacketProcessor) hasValidAuth(t time.Time /*@, ghost ub []byte 
 		log.Debug("Selecting key to authenticate the incoming packet", "err", err)
 		return false
 	}
-	// TODO(aaronbojarski): Fix when found solution for Key reslicing.
+	// TODO(VerifiedSCION): Fix when found solution for Key reslicing.
 	// @ trusted
 	// @ outline (
 	data /*@ , start, end @*/ := p.lastLayer.LayerPayload( /*@ ub @*/ )

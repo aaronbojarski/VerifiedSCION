@@ -26,7 +26,8 @@ import (
 
 pred (s *serializeProxy) NonInitMem() {
     acc(s) && 
-    acc(s.data)
+    acc(s.data) &&
+	(forall i int :: { &s.layers[i] } 0 <= i && i < len(s.layers) ==> acc(&s.layers[i]))
 }
 
 pred (s *serializeProxy) Mem() {
@@ -34,7 +35,6 @@ pred (s *serializeProxy) Mem() {
     acc(s.data) && 
     s.start >= 0 &&
     s.restart >= 0 &&
-    acc(&s.layers) &&
 	(forall i int :: { &s.layers[i] } 0 <= i && i < len(s.layers) ==> acc(&s.layers[i]))
 }
 

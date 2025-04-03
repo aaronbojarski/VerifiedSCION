@@ -39,10 +39,9 @@ ghost const MutexPerm perm = 1/4
 ghost const OutMutexPerm perm = 3/4
 ghost const runningPerm perm = 1/2
 
+// TODO(VerifiedSCION): Not sure yet how to define MutexInvariant. 
+// "d.running" is no longer boolean, so we can not use it here (see previous definition of MutexInvariant).
 pred MutexInvariant(d *DataPlane) {
-	// acc(&d.running, runningPerm) &&
-	// (!d.running ==> acc(d.Mem(), MutexPerm))
-	// TODO(aaronbojarski): Not sure yet how to handle this, since running is no longer boolean
 	false
 }
 

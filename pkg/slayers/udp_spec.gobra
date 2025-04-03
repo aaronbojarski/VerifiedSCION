@@ -17,15 +17,15 @@
 package slayers
 
 pred (u *UDP) Mem(ghost ub []byte) {
-    // TODO(aaronbojarski): also add BaseLayer.Mem()
+    // TODO(VerifiedSCION): also add BaseLayer.Mem()
     acc(u)
 }
 
 trusted
 requires false
 func (u *UDP) LayerPayload(ghost ub []byte) (res []byte, ghost start int, ghost end int) {
-    // TODO(aaronbojarski): Figure out what offset into ub we need to pass here.
+    // TODO(VerifiedSCION): Figure out what offset into ub we need to pass here.
     res = u.BaseLayer.LayerPayload(ub, 0)
-    // TODO(aaronbojarski): Fix start return value.
+    // TODO(VerifiedSCION): Fix start return value.
     return res, 0, len(ub)
 }

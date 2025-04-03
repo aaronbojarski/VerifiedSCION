@@ -43,6 +43,7 @@ type Logger interface {
 	Debug(msg string, ctx ...any)
 	Info(msg string, ctx ...any)
 	Error(msg string, ctx ...any)
-	// TODO(aaronbojarski): Must be added (uncommented) again when needed. But currently no spec for Level.
+	// TODO(VerifiedSCION): "Enabled" must be added (uncommented) again when needed. 
+	// But currently there is no spec for Level.
     // Enabled(lvl Level) bool
 }
