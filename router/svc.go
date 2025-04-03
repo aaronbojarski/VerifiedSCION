@@ -37,6 +37,7 @@ func newServices() *services {
 
 // @ trusted
 // @ requires false
+// @ requires s.Mem()
 func (s *services) AddSvc(svc addr.SVC, a netip.AddrPort) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
@@ -54,6 +55,9 @@ func (s *services) AddSvc(svc addr.SVC, a netip.AddrPort) {
 	//@ fold acc(s.Mem(), R50)
 }
 
+// @ trusted
+// @ requires false
+// @ requires s.Mem()
 func (s *services) DelSvc(svc addr.SVC, a netip.AddrPort) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
@@ -74,6 +78,9 @@ func (s *services) DelSvc(svc addr.SVC, a netip.AddrPort) {
 	//@ fold acc(s.Mem(), R50)
 }
 
+// @ trusted
+// @ requires false
+// @ requires s.Mem()
 func (s *services) Any(svc addr.SVC) (netip.AddrPort, bool) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()

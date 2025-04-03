@@ -235,6 +235,9 @@ func classOfSize(pktSize int) sizeClass {
 
 // Returns a human-friendly representation of the given size class. Avoid bracket notation to make
 // the values possibly easier to use in monitoring queries.
+// @ requires  minSizeClass <= sc && sc < maxSizeClass
+// @ ensures   sc == old(sc)
+// @ decreases
 func (sc sizeClass) String() string {
 	low := strconv.Itoa((1 << sc) >> 1)
 	high := strconv.Itoa((1 << sc) - 1)
@@ -282,6 +285,9 @@ type outputMetrics struct {
 	OutputPacketsTotal prometheus.Counter
 }
 
+// @ requires acc(metrics)
+// @ requires acc(neighbors)
+// @ decreases
 func newInterfaceMetrics(
 	metrics *Metrics,
 	id uint16,
@@ -290,6 +296,9 @@ func newInterfaceMetrics(
 
 	ifLabels := interfaceLabels(id, localIA, neighbors)
 	m := interfaceMetrics{}
+	// @ invariant minSizeClass <= sc
+	// @ invariant sc <= maxSizeClass
+	// @ decreases maxSizeClass - sc
 	for sc := minSizeClass; sc < maxSizeClass; sc++ {
 		scLabels := prometheus.Labels{"sizeclass": sc.String()}
 		m[sc] = newTrafficMetrics(metrics, ifLabels, scLabels)
@@ -297,6 +306,10 @@ func newInterfaceMetrics(
 	return m
 }
 
+// @ trusted
+// @ requires false
+// @ requires metrics.Mem()
+// @ decreases
 func newTrafficMetrics(
 	metrics *Metrics,
 	ifLabels prometheus.Labels,
@@ -344,6 +357,9 @@ func newTrafficMetrics(
 	return c
 }
 
+// @ trusted
+// @ requires false
+// @ requires metrics.Mem()
 func newOutputMetrics(
 	metrics *Metrics,
 	ifLabels prometheus.Labels,
@@ -362,7 +378,10 @@ func newOutputMetrics(
 	return om
 }
 
+// @ requires acc(neighbors)
+// @ decreases
 func interfaceLabels(id uint16, localIA addr.IA, neighbors map[uint16]addr.IA) prometheus.Labels {
+	// @ assume 0 <= id
 	if id == 0 {
 		return prometheus.Labels{
 			"isd_as":          localIA.String(),

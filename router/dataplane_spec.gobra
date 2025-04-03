@@ -101,6 +101,7 @@ pred accForwardingMetrics(metrics map[uint16]interfaceMetrics) {
 }
 
 pred forwardingMetricsMem(v interfaceMetrics, ignoredForInjectivity uint16) {
+	acc(v) &&
 	forall id sizeClass :: { v[id] } id in domain(v) ==> (
 		v[id].InputBytesTotal.Mem()      		&&
 		v[id].InputPacketsTotal.Mem()    		&&
@@ -112,6 +113,7 @@ pred forwardingMetricsMem(v interfaceMetrics, ignoredForInjectivity uint16) {
 }
 
 pred forwardingMetricsNonInjectiveMem(v interfaceMetrics) {
+	acc(v) &&
 	forall id sizeClass :: { v[id] } id in domain(v) ==> (
 		v[id].InputBytesTotal.Mem()      		&&
 		v[id].InputPacketsTotal.Mem()    		&&
@@ -181,7 +183,7 @@ func newOffsetPair(n int) (res seq[offsetPair])
 ghost
 requires acc(d.Mem(), _)
 ensures  acc(&d.internalNextHops, _)
-ensures  d.internalNextHops != nil ==> acc(accAddr(d.internalNextHops), _)
+ensures  d.internalNextHops != nil ==> acc(d.internalNextHops, _)
 decreases
 func (d *DataPlane) getInternalNextHops() {
 	unfold acc(d.Mem(), _)
@@ -230,9 +232,7 @@ decreases
 pure func (d *DataPlane) GetDomInternalNextHops() set[uint16] {
 	return unfolding d.Mem() in
 		d.internalNextHops == nil ?
-			set[uint16]{} :
-			(unfolding accAddr(d.internalNextHops) in
-				domain(d.internalNextHops))
+			set[uint16]{} :	domain(d.internalNextHops)
 }
 
 ghost

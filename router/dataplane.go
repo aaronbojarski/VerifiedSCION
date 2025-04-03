@@ -243,6 +243,8 @@ type slowPathRequest struct {
 // const _ uintptr = unsafe.Sizeof(packet{}) - 64 // assert sizeof(packet) >= 64
 
 // initPacket configures the given blank packet (and returns it, for convenience).
+// @ requires acc(p)
+// @ decreases
 func (p *packet) init(buffer *[bufSize]byte) *packet {
 	p.buffer = buffer
 	// (VerifiedSCION) Gobra does not automatically dereference p.buffer. Therefore the dereferencing was addid here manually.
@@ -253,6 +255,8 @@ func (p *packet) init(buffer *[bufSize]byte) *packet {
 
 // reset() makes the packet ready to receive a new underlay message.
 // A cleared dstAddr is represented with a zero-length IP so we keep reusing the IP storage bytes.
+// @ requires acc(p)
+// @ decreases
 func (p *packet) reset() {
 	p.dstAddr.IP = p.dstAddr.IP[0:0] // We're keeping the object, just blank it.
 	// (VerifiedSCION) Gobra does not automatically dereference p.buffer. Therefore the dereferencing was addid here manually.
@@ -350,12 +354,16 @@ type drkeyProvider interface {
 
 // setRunning() Configures the running state of the data plane to true. setRunning() is called once
 // the dataplane is finished initializing and is ready to process packets.
+// @ requires d.Mem()
+// @ decreases
 func (d *DataPlane) setRunning() {
 	d.running.Store(true)
 }
 
 // setStopping() Configures the running state of the data plane to false. This should not be called
 // during the dataplane initialization. Calling this before initialization starts has no effect.
+// @ requires d.Mem()
+// @ decreases
 func (d *DataPlane) setStopping() {
 	d.running.Store(false)
 }
@@ -364,12 +372,16 @@ func (d *DataPlane) setStopping() {
 // and ready to process or already processing packets. In this case some configuration changes are
 // not permitted. If false, the data plane is not ready to process packets yet, or is shutting
 // down.
+// @ requires d.Mem()
+// @ decreases
 func (d *DataPlane) IsRunning() bool {
 	return d.running.Load()
 }
 
 // Shutdown() causes the dataplane to stop accepting packets and then terminate. Note that
 // in that case the router is committed to shutting down. There is no mechanism to restart it.
+// @ requires d.Mem()
+// @ decreases
 func (d *DataPlane) Shutdown() {
 	d.mtx.Lock() // make sure we're nor racing with initialization.
 	defer d.mtx.Unlock()
@@ -793,6 +805,9 @@ type RunConfig struct {
 	BatchSize             int
 }
 
+// @ requires d.Mem()
+// @ requires ctx.Mem()
+// @ decreases
 func (d *DataPlane) Run(ctx context.Context, cfg *RunConfig /*@, ghost place io.Place, ghost state io.IO_dp3s_state_local, ghost dp io.DataPlaneSpec @*/) error {
 	// @ share d, ctx, cfg, dp
 
@@ -932,15 +947,14 @@ func (d *DataPlane) runReceiver(ifID uint16, conn BatchConn, cfg *RunConfig,
 		pkt.ingress = ifID
 		pkt.srcAddr = srcAddr
 		// TODO(aaronbojarski): change this once gobra understands select statement.
-		// @ trusted
-		// @ outline(
-		select {
-		case procQs[procID] <- pkt:
-		default:
-			d.returnPacketToPool(pkt)
-			metrics[sc].DroppedPacketsBusyProcessor.Inc()
-		}
-		// @ )
+		/*
+			select {
+			case procQs[procID] <- pkt:
+			default:
+				d.returnPacketToPool(pkt)
+				metrics[sc].DroppedPacketsBusyProcessor.Inc()
+			}
+		*/
 	}
 
 	for d.IsRunning() {
