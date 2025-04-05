@@ -34,7 +34,9 @@ pred (s *serializeProxy) Mem() {
     acc(s) && 
     acc(s.data) && 
     s.start >= 0 &&
+    s.start <= len(s.data) &&
     s.restart >= 0 &&
+    s.restart <= cap(s.data) &&
 	(forall i int :: { &s.layers[i] } 0 <= i && i < len(s.layers) ==> acc(&s.layers[i]))
 }
 
@@ -42,16 +44,32 @@ ghost
 pure
 requires acc(s.Mem(), _)
 decreases
-func (s *serializeProxy) getStart() int {
+func (s *serializeProxy) GetStart() int {
     return unfolding s.Mem() in s.start
+}
+
+ghost
+pure
+requires acc(s.Mem(), _)
+decreases
+func (s *serializeProxy) GetDataLen() int {
+    return unfolding s.Mem() in len(s.data)
 }
 
 ghost
 pure
 requires acc(s.NonInitMem(), _)
 decreases
-func (s *serializeProxy) getDataCap() int {
+func (s *serializeProxy) GetDataCap() int {
     return unfolding s.NonInitMem() in cap(s.data)
+}
+
+ghost
+pure
+requires acc(s.Mem(), _)
+decreases
+func (s *serializeProxy) GetDataCapMem() int {
+    return unfolding s.Mem() in cap(s.data)
 }
 
 ghost

@@ -66,7 +66,7 @@ func newSerializeProxyStart(buf []byte, start int) (res serializeProxy) {
 // The next prepend will claim an area ending with index newStart - 1. The next append will claim an
 // area starting with index newStart.
 // @ requires s.NonInitMem()
-// @ requires 0 <= newStart && newStart <= s.getDataCap()
+// @ requires 0 <= newStart && newStart <= s.GetDataCap()
 // @ ensures  s.Mem()
 // @ decreases
 func (s *serializeProxy) clear(newStart int) {
@@ -91,7 +91,7 @@ func (s *serializeProxy) clear(newStart int) {
 func (s *serializeProxy) Clear() error {
 	// @ unfold s.Mem()
 	restart := s.restart
-	// @ fold s.Mem()
+	// @ fold s.NonInitMem()
 	s.clear(restart)
 	return nil
 }
@@ -99,7 +99,7 @@ func (s *serializeProxy) Clear() error {
 // PrependBytes implements serializeBuffer.PrependBytes(). It never returns an error.
 // It can panic if attenpting to prepend before the start of the buffer.
 // @ requires s.Mem()
-// @ requires 0 <= num && num <= s.getStart()
+// @ requires 0 <= num && num <= s.GetStart()
 // @ decreases
 func (s *serializeProxy) PrependBytes(num int) ([]byte, error) {
 	// @ unfold s.Mem()
@@ -112,7 +112,7 @@ func (s *serializeProxy) PrependBytes(num int) ([]byte, error) {
 // AppendBytes implements serializeBuffer.AppendBytes(). It never returns an error.
 // It can panic if attempting to append past the end of the buffer.
 // @ requires s.Mem()
-// @ requires 0 <= num
+// @ requires 0 <= num && s.GetDataLen() + num <= s.GetDataCapMem()
 // @ decreases
 func (s *serializeProxy) AppendBytes(num int) ([]byte, error) {
 	// @ unfold s.Mem()
