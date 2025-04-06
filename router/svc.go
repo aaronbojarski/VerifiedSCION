@@ -31,7 +31,9 @@ type services struct {
 	m   map[addr.SVC][]netip.AddrPort
 }
 
-func newServices() *services {
+// @ ensures s.Mem()
+// @ decreases
+func newServices() (s *services) {
 	return &services{m: make(map[addr.SVC][]netip.AddrPort)}
 }
 

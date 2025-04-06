@@ -127,53 +127,9 @@ type bfdSession interface {
 type BatchConn interface {
 	// @ pred Mem()
 
-	// @ requires  acc(Mem(), _)
-	// @ requires  forall i int :: { &msgs[i] } 0 <= i && i < len(msgs) ==>
-	// @ 	msgs[i].Mem()
-	// @ requires forall j int :: { &msgs[j] } 0 <= j && j < len(msgs) ==>
-	// @ 	sl.Bytes(msgs[j].GetFstBuffer(), 0, len(msgs[j].GetFstBuffer()))
-	// @ ensures   forall i int :: { &msgs[i] } 0 <= i && i < len(msgs) ==>
-	// @ 	(msgs[i].Mem() && msgs[i].HasActiveAddr())
-	// @ ensures   err == nil ==> 0 <= n && n <= len(msgs)
-	// @ ensures   err == nil ==>
-	// @ 	forall i int :: { &msgs[i] } 0 <= i && i < n ==> (
-	// @ 		typeOf(msgs[i].GetAddr()) == type[*net.UDPAddr] &&
-	// @ 		!msgs[i].HasWildcardPermAddr())
-	// @ ensures   err == nil ==>
-	// @ 	forall i int :: { &msgs[i] } 0 <= i && i < n ==> msgs[i].GetN() <= len(msgs[i].GetFstBuffer())
-	// @ ensures forall j int :: { &msgs[j] } 0 <= j && j < len(msgs) ==>
-	// @ 	sl.Bytes(msgs[j].GetFstBuffer(), 0, len(msgs[j].GetFstBuffer()))
-	// @ ensures   err != nil ==> err.ErrorMem()
-	// contracts for IO-spec
-	//  requires  Prophecy(prophecyM)
-	//  requires  io.token(place) && MultiReadBio(place, prophecyM)
-	//  ensures   err != nil ==> prophecyM == 0
-	//  ensures   err == nil ==> prophecyM == n
-	//  ensures   io.token(old(MultiReadBioNext(place, prophecyM)))
-	//  ensures   old(MultiReadBioCorrectIfs(place, prophecyM, path.ifsToIO_ifs(ingressID)))
-	//  ensures   err == nil ==>
-	//  	forall i int :: { &msgs[i] } 0 <= i && i < n ==>
-	//  		MsgToAbsVal(&msgs[i], ingressID) == old(MultiReadBioIO_val(place, n)[i])
 	// TODO(VerifiedSCION): add ghost parameters and IO contracts again once actually verifying the function.
 	ReadBatch(msgs underlayconn.Messages /*, ghost ingressID uint16, ghost prophecyM int, ghost place io.Place */) (n int, err error)
 
-	// @ requires  acc(Mem(), _)
-	// (VerifiedSCION) opted for less reusable spec for WriteBatch for
-	// performance reasons.
-	// @ requires  len(msgs) == 1
-	// @ requires  acc(msgs[0].Mem(), R50) && msgs[0].HasActiveAddr()
-	// @ requires  acc(sl.Bytes(msgs[0].GetFstBuffer(), 0, len(msgs[0].GetFstBuffer())), R50)
-	// preconditions for IO-spec:
-	// requires  MsgToAbsVal(&msgs[0], egressID) == ioAbsPkts
-	// requires  io.token(place) && io.CBioIO_bio3s_send(place, ioAbsPkts)
-	// @ ensures   acc(msgs[0].Mem(), R50) && msgs[0].HasActiveAddr()
-	// @ ensures   acc(sl.Bytes(msgs[0].GetFstBuffer(), 0, len(msgs[0].GetFstBuffer())), R50)
-	// @ ensures   err == nil ==> 0 <= n && n <= len(msgs)
-	// @ ensures   err != nil ==> err.ErrorMem()
-	// postconditions for IO-spec:
-	// (VerifiedSCION) the permission to the protocol must always be returned,
-	// otherwise the router cannot continue after failing to send a packet.
-	// ensures   io.token(old(io.dp3s_iospec_bio3s_send_T(place, ioAbsPkts)))
 	// TODO(VerifiedSCION): add ghost parameters and IO contracts again once actually verifying the function.
 	WriteBatch(msgs underlayconn.Messages, flags int /*, ghost egressID uint16, ghost place io.Place, ghost ioAbsPkts io.IO_val */) (n int, err error)
 
@@ -944,7 +900,7 @@ func (d *DataPlane) runReceiver(ifID uint16, conn BatchConn, cfg *RunConfig,
 		pkt.rawPacket = pkt.rawPacket[:size] // Update size; readBatch does not.
 		pkt.ingress = ifID
 		pkt.srcAddr = srcAddr
-		// TODO(VerifiedSCION): Uncomment this once gobra understands the select statement.
+		// TODO(VerifiedSCION): Uncomment this once gobra understands the select statement!!!!!!!!!!!!!!!!!!!
 		/*
 			select {
 			case procQs[procID] <- pkt:
@@ -3176,6 +3132,9 @@ func (p *slowPathPacketProcessor) prepareSCMP(
 		if err := p.resetSPAOMetadata(key, now); err != nil {
 			return serrors.JoinNoStack(cannotRoute, err, "details", "resetting SPAO header")
 		}
+		// TODO(VerifiedSCION): Uncomment the following lines!!!!
+		// This was done temporarily since gobra has issues with the slice operation at "key.Key[:]".
+		// A simplified example can be found in a git repo of aaronbojarski.
 		/*
 			e2e.Options = []*slayers.EndToEndOption{p.optAuth.EndToEndOption}
 			e2e.NextHdr = slayers.L4SCMP
