@@ -20,6 +20,7 @@ import (
 	"context"
 	"hash"
 	"net"
+	"net/netip"
 
 	"github.com/scionproto/scion/pkg/addr"
 	"github.com/scionproto/scion/pkg/slayers"
@@ -59,25 +60,15 @@ func foldDataPlaneMem() (d *DataPlane) {
 	fold accBatchConn(d.external)
 	d.linkTypes = make(map[uint16]topology.LinkType)
 	d.neighborIAs = make(map[uint16]addr.IA)
-	d.internalNextHops = make(map[uint16]*net.UDPAddr)
+	d.internalNextHops = make(map[uint16]netip.AddrPort)
 	fold accAddr(d.internalNextHops)
 	d.svc = newServices()
 	d.bfdSessions = make(map[uint16]bfdSession)
 	fold accBfdSession(d.bfdSessions)
-	d.forwardingMetrics = make(map[uint16]forwardingMetrics)
+	d.forwardingMetrics = make(map[uint16]interfaceMetrics)
 	fold accForwardingMetrics(d.forwardingMetrics)
 	fold d.Mem()
 	fold MutexInvariant(d)
-}
-
-requires MutexInvariant(d) && acc(d.Mem(), OutMutexPerm)
-requires !d.IsRunning()
-ensures  acc(&d.running)
-decreases
-func canModifyRunning(d *DataPlane) {
-	unfold MutexInvariant(d)
-	d.isRunningEq()
-	unfold d.Mem()
 }
 
 requires macFactory != nil                        &&
@@ -119,12 +110,11 @@ func testRun(
 		uint16(3): 1000,
 	}
 
-	a1 := allocateUDPAddr()
-	d.internalNextHops = map[uint16]*net.UDPAddr{
+	a1 := allocateAddrPort()
+	d.internalNextHops = map[uint16]netip.AddrPort{
 		uint16(4): a1,
 	}
 
-	d.internal = allocateBatchConn()
 	fold accAddr(d.internalNextHops)
 	d.svc = newServices()
 	d.macFactory = macFactory
@@ -133,7 +123,7 @@ func testRun(
 	d.Metrics = metrics
 	d.bfdSessions = make(map[uint16]bfdSession)
 	fold accBfdSession(d.bfdSessions)
-	d.forwardingMetrics = make(map[uint16]forwardingMetrics)
+	d.forwardingMetrics = make(map[uint16]interfaceMetrics)
 	fold accForwardingMetrics(d.forwardingMetrics)
 
 	ensures dp.Valid()
@@ -220,8 +210,6 @@ func testRun(
 	assert reveal d.PreWellConfigured()
 	fold MutexInvariant!< d !>()
 	// end of foldDataPlaneMem
-	assert !d.IsRunning()
-	assert d.InternalConnIsSet()
 	assert d.KeyIsSet()
 	assert d.SvcsAreSet()
 	assert d.MetricsAreSet()
@@ -233,14 +221,19 @@ func testRun(
 	inhale io.token(place)
 	inhale dp.dp3s_iospec_ordered(state, place)
 
-	d.Run(ctx, place, state, dp)
+	cfg := &RunConfig{
+		NumProcessors:         8,
+		BatchSize:             256,
+		NumSlowPathProcessors: 1,
+	}
+
+	d.Run(ctx, cfg, place, state, dp)
 }
 
 ensures b != nil && b.Mem()
 func allocateBatchConn() (b BatchConn)
 
-ensures u != nil && u.Mem()
-func allocateUDPAddr() (u *net.UDPAddr)
+func allocateAddrPort() (u netip.AddrPort)
 
 // the following trivial assertion makes sure that `==` matches
 // `===` for ghost structs

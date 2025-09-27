@@ -20,9 +20,10 @@
 package control
 
 import (
-	"net"
+	"net/netip"
 
 	"github.com/scionproto/scion/pkg/addr"
+	"github.com/scionproto/scion/pkg/segment/iface"
 	"github.com/scionproto/scion/private/topology"
 )
 
@@ -38,35 +39,37 @@ const (
 // LinkEnd represents on end of a link.
 type LinkEnd struct {
 	IA   addr.IA
-	Addr *net.UDPAddr
+	Addr netip.AddrPort
+	IfID iface.ID
 }
 
 // BFD is the configuration for the BFD sessions.
 type BFD topology.BFD
 
-// InternalInterface represents the internal interface of a router.
+// InternalInterface represents the internal underlay interface of a router.
 type InternalInterface struct {
 	IA   addr.IA
-	Addr *net.UDPAddr
+	Addr netip.AddrPort
 }
 
-// ExternalInterface represents an external interface of a router.
+// ExternalInterface represents an external underlay interface of a router.
 type ExternalInterface struct {
 	// InterfaceID is the identifier of the external interface.
-	InterfaceID uint16
+	IfID uint16
 	// Link is the information associated with this link.
 	Link LinkInfo
 	// State indicates the interface state.
 	State InterfaceState
 }
 
-// SiblingInterface represents a sibling interface of a router.
+// SiblingInterface represents a sibling underlay interface of a router. A sibling interface
+// is an external interface owned by another router in the same AS.
 type SiblingInterface struct {
 	// InterfaceID is the identifier of the external interface.
-	InterfaceID uint16
+	IfID uint16
 	// InternalInterfaces is the local address (internal interface)
 	// of the sibling router that owns this interface.
-	InternalInterface *net.UDPAddr
+	InternalInterface netip.AddrPort
 	// Relationship describes the type of inter-AS links.
 	Relationship topology.LinkType
 	// MTU is the maximum Transmission Unit for SCION packets.
@@ -79,6 +82,8 @@ type SiblingInterface struct {
 	State InterfaceState
 }
 
+// LinkInfo contains the information about a link between an internal and
+// external router.
 type LinkInfo struct {
 	Local    LinkEnd
 	Remote   LinkEnd

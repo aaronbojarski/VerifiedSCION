@@ -47,6 +47,10 @@ preserves a != nil ==> acc(a.Mem(), R20)
 decreases
 func (a *UDPAddr) String() string
 
+trusted
+requires false
+func (a *UDPAddr) AddrPort() netip.AddrPort
+
 // UDPConn is the implementation of the Conn and PacketConn interfaces
 // for UDP network connections.
 type UDPConn struct {

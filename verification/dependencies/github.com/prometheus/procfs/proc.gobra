@@ -1,10 +1,9 @@
-// Copyright 2022 ETH Zurich
-//
+// Copyright 2018 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//   http://www.apache.org/licenses/LICENSE-2.0
+// http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,23 +13,15 @@
 
 // +gobra
 
-package router
+package procfs
 
-import (
-	"net/netip"
+// Proc provides information about a running process.
+type Proc struct {
+	// The process ID.
+	PID int
 
-	"github.com/scionproto/scion/pkg/addr"
-)
-
-func foldInternalLockInvAndMem_test() {
-	s := &services{m: make(map[addr.SVC][]netip.AddrPort)}
-	fold internalLockInv!<s!>()
-	s.mtx.SetInv(internalLockInv!<s!>)
-	fold s.Mem()
+	fs FS
 }
 
-func foldValidMapValueFold_test() {
-	var svc addr.SVC = addr.SVC(1)
-	var v []netip.AddrPort = nil
-	fold validMapValue(svc, v)
-}
+// Procs represents a list of Proc structs.
+type Procs []Proc

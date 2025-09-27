@@ -1,4 +1,4 @@
-// Copyright 2022 ETH Zurich
+// Copyright 2020 Anapaya Systems
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,23 +14,18 @@
 
 // +gobra
 
-package router
+package slayers
 
-import (
-	"net/netip"
-
-	"github.com/scionproto/scion/pkg/addr"
-)
-
-func foldInternalLockInvAndMem_test() {
-	s := &services{m: make(map[addr.SVC][]netip.AddrPort)}
-	fold internalLockInv!<s!>()
-	s.mtx.SetInv(internalLockInv!<s!>)
-	fold s.Mem()
+pred (u *UDP) Mem(ghost ub []byte) {
+    // TODO(VerifiedSCION): also add BaseLayer.Mem()
+    acc(u)
 }
 
-func foldValidMapValueFold_test() {
-	var svc addr.SVC = addr.SVC(1)
-	var v []netip.AddrPort = nil
-	fold validMapValue(svc, v)
+trusted
+requires false
+func (u *UDP) LayerPayload(ghost ub []byte) (res []byte, ghost start int, ghost end int) {
+    // TODO(VerifiedSCION): Figure out what offset into ub we need to pass here.
+    res = u.BaseLayer.LayerPayload(ub, 0)
+    // TODO(VerifiedSCION): Fix start return value.
+    return res, 0, len(ub)
 }

@@ -27,11 +27,8 @@ import (
 
 pred (b *bfdSend) Mem() {
 	acc(b) &&
-	b.srcAddr.Mem() &&
-	b.dstAddr.Mem() &&
 	acc(b.scn) &&
 	acc(b.ohp) &&
 	b.mac.Mem() &&
-	sl.Bytes(b.macBuffer, 0, path.MACBufferSize) &&
-	b.buffer.Mem()
+	sl.Bytes(b.macBuffer, 0, path.MACBufferSize)
 }

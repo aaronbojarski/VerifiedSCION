@@ -78,3 +78,10 @@ ensures   res != nil && res.ErrorMem()
 ensures   res.IsDuplicableMem()
 decreases
 func New(msg string, errCtx ...interface{}) (res error)
+
+requires  cause != nil ==> cause.ErrorMem()
+preserves forall i int :: { &errCtx[i] } 0 <= i && i < len(errCtx) ==> acc(&errCtx[i], R15)
+ensures   res != nil && res.ErrorMem()
+ensures   cause != nil ==> (res.ErrorMem() --* cause.ErrorMem())
+decreases
+func JoinNoStack(err, cause error, errCtx ...any) (res error)

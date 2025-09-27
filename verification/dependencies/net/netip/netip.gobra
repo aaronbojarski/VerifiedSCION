@@ -55,14 +55,32 @@ decreases _
 func (ip Addr) IsValid() (res bool)
 
 decreases _
+func (ip Addr) Zone() string
+
+decreases _
 func (ip Addr) Is4() bool
 
 decreases _
 func (ip Addr) Is6() bool
 
+decreases _
+func (ip Addr) Is4In6() bool
+
+decreases _
+func (ip Addr) As4() (a4 [4]byte)
+
+decreases _
+func (ip Addr) As16() (a16 [16]byte)
+
 ensures ip.IsValidSpec() ==> sl.Bytes(b, 0, len(b))
 decreases _
 func (ip Addr) AsSlice() (b []byte)
+
+decreases _
+func (ip Addr) IsUnspecified() bool
+
+decreases _
+func AddrFromSlice(slice []byte) (ip Addr, ok bool)
 
 ghost
 pure
@@ -75,3 +93,9 @@ func (p AddrPort) IsValid() (res bool)
 
 decreases _
 func (p AddrPort) Addr() Addr
+
+decreases _
+func (p AddrPort) Port() uint16
+
+decreases _
+func (p AddrPort) String() string

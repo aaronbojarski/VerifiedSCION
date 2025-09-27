@@ -1,0 +1,23 @@
+// Copyright 2017 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+//go:generate go run make_tables.go
+
+// Package bits implements bit counting and manipulation
+// functions for the predeclared unsigned integer types.
+//
+// Functions in this package may be implemented directly by
+// the compiler, for better performance. For those functions
+// the code in this package will not be used. Which
+// functions are implemented by the compiler depends on the
+// architecture and the Go release.
+
+// +gobra
+
+package bits
+
+// Len32 returns the minimum number of bits required to represent x; the result is 0 for x == 0.
+ensures 0 <= n && n <= 32
+decreases
+func Len32(x uint32) (n int)

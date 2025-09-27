@@ -89,3 +89,7 @@ ensures   c != nil
 ensures   acc(c.Mem(), _)
 decreases _
 func (v *CounterVec) With(labels Labels) (c Counter)
+
+trusted
+requires false
+func (v *CounterVec) MustCurryWith(labels Labels) *CounterVec
