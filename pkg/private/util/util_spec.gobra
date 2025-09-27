@@ -27,3 +27,10 @@ func SecsToTime(t uint32) time.Time
 
 decreases
 func SecsToCompact(t uint32) string
+
+decreases
+func TimeToSecs(time.Time) uint32
+
+ensures err != nil ==> err.ErrorMem()
+decreases
+func ParseDuration(durationStr string) (t time.Duration, err error)

@@ -10,7 +10,7 @@
 package layers
 
 import (
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 	sl "github.com/scionproto/scion/verification/utils/slices"
 )
 

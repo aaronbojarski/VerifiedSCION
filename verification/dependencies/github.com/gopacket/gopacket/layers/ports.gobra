@@ -8,6 +8,6 @@
 
 package layers
 
-import "github.com/google/gopacket"
+import "github.com/gopacket/gopacket"
 
 type UDPPort uint16

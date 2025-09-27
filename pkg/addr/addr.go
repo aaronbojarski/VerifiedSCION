@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +gobra
+
 package addr
 
 import (
@@ -31,7 +33,9 @@ type Addr struct {
 
 // ParseAddr parses s as an address in the format <ISD>-<AS>,<Host>,
 // returning the result as an Addr.
-func ParseAddr(s string) (Addr, error) {
+// @ ensures err != nil ==> err.ErrorMem()
+// @ decreases
+func ParseAddr(s string) (addr Addr, err error) {
 	comma := strings.IndexByte(s, ',')
 	if comma < 0 {
 		return Addr{}, serrors.New("invalid address: expected comma", "value", s)
@@ -49,6 +53,7 @@ func ParseAddr(s string) (Addr, error) {
 
 // MustParseAddr calls ParseAddr(s) and panics on error.
 // It is intended for use in tests with hard-coded strings.
+// @ requires false
 func MustParseAddr(s string) Addr {
 	a, err := ParseAddr(s)
 	if err != nil {
@@ -57,11 +62,14 @@ func MustParseAddr(s string) Addr {
 	return a
 }
 
+// @ decreases
 func (a Addr) String() string {
 	return fmt.Sprintf("%s,%s", a.IA, a.Host)
 }
 
 // Set implements flag.Value interface
+// @ preserves acc(a)
+// @ decreases
 func (a *Addr) Set(s string) error {
 	pA, err := ParseAddr(s)
 	if err != nil {
@@ -71,10 +79,14 @@ func (a *Addr) Set(s string) error {
 	return nil
 }
 
+// @ decreases
 func (a Addr) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
 }
 
+// @ preserves acc(a)
+// @ preserves forall i int :: { &b[i] } 0 <= i && i < len(b) ==> acc(&b[i])
+// @ decreases
 func (a *Addr) UnmarshalText(b []byte) error {
 	return a.Set(string(b))
 }
@@ -90,6 +102,7 @@ func (a *Addr) UnmarshalText(b []byte) error {
 //
 // EXPERIMENTAL: This API is experimental. It may be changed to return a
 // combined AddrPort type instead.
+// @ decreases
 func ParseAddrPort(s string) (Addr, uint16, error) {
 	host, port, err := net.SplitHostPort(s)
 	if err != nil {
@@ -112,6 +125,7 @@ func ParseAddrPort(s string) (Addr, uint16, error) {
 //
 // EXPERIMENTAL: This API is experimental. It may be changed to a String()
 // function an a combined AddrPort type instead.
+// @ decreases
 func FormatAddrPort(a Addr, port uint16) string {
 	return fmt.Sprintf("[%s]:%d", a, port)
 }

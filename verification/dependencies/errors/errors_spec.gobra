@@ -88,3 +88,10 @@ type ErrorCell interface {
 	decreases
 	CanSet(e error) bool
 }
+
+// New returns an error that formats as the given text.
+// Each call to New returns a distinct error value even if the text is identical.
+ensures   res != nil && res.ErrorMem()
+ensures   res.IsDuplicableMem()
+decreases
+func New(text string) (res error)

@@ -28,14 +28,9 @@ lemma BitAnd3_64bit(b: bv64)
 		(b == 4 ==> res == 0)
 {}
 
-lemma BitAnd7_32bit(b: bv32)
-	ensures var res := b & 0x7;
-		0 <= res <= 7
-{}
-
-lemma BitAnd7_64bit(b: bv64)
-	ensures var res := b & 0x7;
-		0 <= res <= 7
+lemma BitAndF(b: bv8)
+	ensures var res := b & 0xF;
+		0 <= res <= 15
 {}
 
 lemma Shift30LessThan4(b: bv32)

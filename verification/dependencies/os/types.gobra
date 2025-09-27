@@ -1,0 +1,16 @@
+// Copyright 2009 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// +gobra
+
+package os
+
+import def "github.com/scionproto/scion/verification/utils/definitions"
+
+// File represents an open file descriptor.
+//
+// The methods of File are safe for concurrent use.
+type File struct {
+	privateField def.PrivateField
+}

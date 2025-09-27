@@ -28,3 +28,7 @@ ensures err == nil ==> n.Mem()
 ensures err == nil ==> n.toInt() >= 0 && n.toInt() < max.toInt()
 decreases _
 func Int(rand io.Reader, max *big.Int) (n *big.Int, err error)
+
+trusted
+requires false
+func Read(b []byte) (n int, err error)

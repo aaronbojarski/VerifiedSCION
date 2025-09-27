@@ -51,6 +51,8 @@
 
 //go:build linux
 
+// +gobra
+
 package processmetrics
 
 import (
@@ -197,7 +199,11 @@ func (c *procStatCollector) Collect(ch chan<- prometheus.Metric) {
 // to scraping requests. Call this only once per process or get an error.
 // It is safe to ignore errors from this but prometheus may lack some
 // metrics.
-func Init() error {
+// @ trusted
+// @ requires false
+// @ ensures retErr != nil ==> retErr.ErrorMem()
+// @ decreases
+func Init() (retErr error) {
 	me := os.Getpid()
 	taskPath := filepath.Join(procfs.DefaultMountPoint, strconv.Itoa(me), "task")
 	taskDir, err := os.Open(taskPath)

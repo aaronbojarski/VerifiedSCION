@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +gobra
+
 package drkeyutil
 
 import (
@@ -22,6 +24,7 @@ import (
 	"github.com/scionproto/scion/pkg/private/serrors"
 	"github.com/scionproto/scion/pkg/scrypto/cppki"
 	"github.com/scionproto/scion/pkg/spao"
+	// @ . "github.com/scionproto/scion/verification/utils/definitions"
 )
 
 type FakeProvider struct {
@@ -29,11 +32,15 @@ type FakeProvider struct {
 	AcceptanceWindow time.Duration
 }
 
+// @ requires  acc(p, R50)
+// @ requires  p.EpochDuration >= time.Second
+// @ ensures   err != nil ==> err.ErrorMem()
+// @ decreases
 func (p *FakeProvider) GetASHostKey(
 	validTime time.Time,
 	_ addr.IA,
 	_ addr.Host,
-) (drkey.ASHostKey, error) {
+) (k drkey.ASHostKey, err error) {
 
 	duration := int64(p.EpochDuration / time.Second)
 	idxCurrent := validTime.Unix() / duration
@@ -44,12 +51,16 @@ func (p *FakeProvider) GetASHostKey(
 	}, nil
 }
 
+// @ requires  acc(p, R45)
+// @ requires  p.EpochDuration >= time.Second
+// @ ensures   err != nil ==> err.ErrorMem()
+// @ decreases
 func (p *FakeProvider) GetKeyWithinAcceptanceWindow(
 	t time.Time,
 	timestamp uint64,
 	dstIA addr.IA,
 	dstAddr addr.Host,
-) (drkey.ASHostKey, error) {
+) (k drkey.ASHostKey, err error) {
 
 	keys, err := p.getASHostTriple(t, dstIA, dstAddr)
 	if err != nil {
@@ -80,11 +91,16 @@ func (p *FakeProvider) GetKeyWithinAcceptanceWindow(
 	}
 }
 
+// @ requires  acc(p, R50)
+// @ requires  p.EpochDuration >= time.Second
+// @ ensures   acc(&k[0]) && acc(&k[1]) && acc(&k[2])
+// @ ensures   err != nil ==> err.ErrorMem()
+// @ decreases
 func (p *FakeProvider) getASHostTriple(
 	validTime time.Time,
 	_ addr.IA,
 	_ addr.Host,
-) ([]drkey.ASHostKey, error) {
+) (k []drkey.ASHostKey, err error) {
 
 	duration := int64(p.EpochDuration / time.Second)
 	idxCurrent := validTime.Unix() / duration
@@ -108,6 +124,7 @@ func (p *FakeProvider) getASHostTriple(
 	}, nil
 }
 
+// @ decreases
 func newEpoch(idx int64, duration int64) drkey.Epoch {
 	begin := uint32(idx * duration)
 	end := begin + uint32(duration)

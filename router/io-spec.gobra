@@ -94,15 +94,6 @@ func AbsUnsupportedPktIsUnsupportedVal(raw []byte, ingressID uint16) {
 }
 
 ghost
-requires respr.OutPkt != nil ==>
-	sl.Bytes(respr.OutPkt, 0, len(respr.OutPkt))
-decreases
-pure func absReturnErr(respr processResult) (val io.IO_val) {
-	return respr.OutPkt == nil ? io.IO_val_Unit{} :
-		absIO_val(respr.OutPkt, respr.EgressID)
-}
-
-ghost
 requires acc(&d.localIA)
 decreases
 pure func (d *DataPlane) dpSpecWellConfiguredLocalIA(dp io.DataPlaneSpec) bool {

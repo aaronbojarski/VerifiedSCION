@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// +gobra
+
 package drkeyutil
 
 import (
@@ -33,6 +35,7 @@ const (
 	EnvVarAcceptanceWindow  = "SCION_TESTING_ACCEPTANCE_WINDOW"
 )
 
+// @ decreases
 func LoadEpochDuration() time.Duration {
 	s := os.Getenv(EnvVarEpochDuration)
 	if s == "" {
@@ -45,6 +48,7 @@ func LoadEpochDuration() time.Duration {
 	return duration
 }
 
+// @ decreases
 func LoadAcceptanceWindow() time.Duration {
 	s := os.Getenv(EnvVarAcceptanceWindow)
 	if s == "" {

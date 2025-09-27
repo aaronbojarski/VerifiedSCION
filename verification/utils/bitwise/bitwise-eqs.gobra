@@ -35,10 +35,11 @@ decreases
 pure func BitAnd3(b int) (res int)
 
 ghost
-ensures 0 <= b & 0x7 && b & 0x7 <= 7
-ensures res == b & 0x7
+pure
+ensures 0 <= b & 0xF && b & 0xF <= 15
+ensures res == b & 0xF
 decreases
-pure func BitAnd7(b int) (res int)
+func BitAndF(b byte) (res byte)
 
 ghost
 ensures res == b >> 30

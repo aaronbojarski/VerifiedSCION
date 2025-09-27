@@ -1,0 +1,40 @@
+// Copyright 2022 ETH Zurich
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// This file contains definitions, constants, and global variables (constant maps)
+// from the pkg/proto/drkey package. They were copied from drkey.pb.go to avoid having
+// to verify the whole file for now. The original file shall be verified in the future.
+
+// +gobra
+
+package drkey
+
+type Protocol int32
+
+const (
+	Protocol_PROTOCOL_GENERIC_UNSPECIFIED Protocol = 0
+	Protocol_PROTOCOL_SCMP                Protocol = 1
+)
+
+// Enum value maps for Protocol.
+var (
+	Protocol_name = map[int32]string{
+		0: "PROTOCOL_GENERIC_UNSPECIFIED",
+		1: "PROTOCOL_SCMP",
+	}
+	Protocol_value = map[string]int32{
+		"PROTOCOL_GENERIC_UNSPECIFIED": 0,
+		"PROTOCOL_SCMP":                1,
+	}
+)

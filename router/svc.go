@@ -31,10 +31,15 @@ type services struct {
 	m   map[addr.SVC][]netip.AddrPort
 }
 
-func newServices() *services {
+// @ ensures s.Mem()
+// @ decreases
+func newServices() (s *services) {
 	return &services{m: make(map[addr.SVC][]netip.AddrPort)}
 }
 
+// @ trusted
+// @ requires false
+// @ requires s.Mem()
 func (s *services) AddSvc(svc addr.SVC, a netip.AddrPort) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
@@ -47,13 +52,14 @@ func (s *services) AddSvc(svc addr.SVC, a netip.AddrPort) {
 	//@ fold acc(validMapValue(svc, addrs), R10)
 	//@ unfold validMapValue(svc, addrs)
 	s.m[svc] = append( /*@ R10, @*/ addrs, a)
-	//@ ghost tmp := s.m[svc]
-	//@ fold InjectiveMem(tmp[len(tmp)-1], len(tmp)-1)
 	//@ fold validMapValue(svc, s.m[svc])
 	//@ fold internalLockInv!<s!>()
 	//@ fold acc(s.Mem(), R50)
 }
 
+// @ trusted
+// @ requires false
+// @ requires s.Mem()
 func (s *services) DelSvc(svc addr.SVC, a netip.AddrPort) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
@@ -64,10 +70,8 @@ func (s *services) DelSvc(svc addr.SVC, a netip.AddrPort) {
 	if index == -1 {
 		return
 	}
-	//@ fold acc(hiddenPerm(a), R10)
 	//@ assert 0 < len(addrs)
 	//@ unfold validMapValue(svc, addrs)
-	//@ unfold InjectiveMem(addrs[len(addrs)-1], len(addrs)-1)
 	addrs[index] = addrs[len(addrs)-1]
 	addrs[len(addrs)-1] = netip.AddrPort{}
 	s.m[svc] = addrs[:len(addrs)-1]
@@ -76,6 +80,9 @@ func (s *services) DelSvc(svc addr.SVC, a netip.AddrPort) {
 	//@ fold acc(s.Mem(), R50)
 }
 
+// @ trusted
+// @ requires false
+// @ requires s.Mem()
 func (s *services) Any(svc addr.SVC) (netip.AddrPort, bool) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()

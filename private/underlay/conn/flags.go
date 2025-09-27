@@ -15,6 +15,8 @@
 //go:build !linux
 // +build !linux
 
+// +gobra
+
 package conn
 
 const syscallMSG_WAITFORONE = 0

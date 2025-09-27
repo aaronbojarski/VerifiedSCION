@@ -86,38 +86,3 @@ decreases _
 func establishInvalidDstIA()
 
 /**** End of post-init invariants ****/
-
-/**** scmpError ghost members ****/
-
-// Gobra currently runs into unexpected verification errors
-// when trying to prove the termination of these methods
-// ('IsDuplicableMem' and 'Duplicate').
-// https://github.com/viperproject/gobra/issues/702
-
-ghost
-trusted
-requires err.ErrorMem()
-decreases err.ErrorMem()
-pure func (err scmpError) IsDuplicableMem() bool {
-	return unfolding err.ErrorMem() in
-		err.Cause.IsDuplicableMem()
-}
-
-ghost
-trusted
-preserves err.ErrorMem()
-ensures   err.IsDuplicableMem() == old(err.IsDuplicableMem())
-ensures   err.IsDuplicableMem() ==> err.ErrorMem()
-decreases err.ErrorMem()
-func (err scmpError) Duplicate() {
-	if err.IsDuplicableMem() {
-		unfold err.ErrorMem()
-		assert err.Cause.IsDuplicableMem()
-		err.Cause.Duplicate()
-		assert err.Cause.ErrorMem() && err.Cause.ErrorMem()
-		fold err.ErrorMem()
-		fold err.ErrorMem()
-	}
-}
-
-/**** End of scmpError ghost members ****/

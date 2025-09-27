@@ -1,0 +1,101 @@
+// Copyright 2020 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Package netip defines an IP address type that's a small value type.
+// Building on that [Addr] type, the package also defines [AddrPort] (an
+// IP address and a port) and [Prefix] (an IP address and a bit length
+// prefix).
+//
+// Compared to the [net.IP] type, [Addr] type takes less memory, is immutable,
+// and is comparable (supports == and being a map key).
+
+// +gobra
+
+package netip
+
+import (
+  	def "github.com/scionproto/scion/verification/utils/definitions"
+	sl "github.com/scionproto/scion/verification/utils/slices"
+)
+
+
+type Addr struct {
+	privateField def.PrivateField
+}
+
+type AddrPort struct {
+	ip   Addr
+	port uint16
+}
+
+decreases _
+func (ip Addr) String() string
+
+ensures err != nil ==> err.ErrorMem()
+decreases _
+func ParseAddr(s string) (addr Addr, err error)
+
+decreases _
+func AddrFrom4(addr [4]byte) Addr
+
+decreases _
+func AddrFrom16(addr [16]byte) Addr
+
+decreases _
+func (ip Addr) Unmap() Addr
+
+ghost
+pure
+decreases _
+func (ip Addr) IsValidSpec() bool
+
+ensures res == ip.IsValidSpec()
+decreases _
+func (ip Addr) IsValid() (res bool)
+
+decreases _
+func (ip Addr) Zone() string
+
+decreases _
+func (ip Addr) Is4() bool
+
+decreases _
+func (ip Addr) Is6() bool
+
+decreases _
+func (ip Addr) Is4In6() bool
+
+decreases _
+func (ip Addr) As4() (a4 [4]byte)
+
+decreases _
+func (ip Addr) As16() (a16 [16]byte)
+
+ensures ip.IsValidSpec() ==> sl.Bytes(b, 0, len(b))
+decreases _
+func (ip Addr) AsSlice() (b []byte)
+
+decreases _
+func (ip Addr) IsUnspecified() bool
+
+decreases _
+func AddrFromSlice(slice []byte) (ip Addr, ok bool)
+
+ghost
+pure
+decreases _
+func (ip AddrPort) IsValidSpec() bool
+
+ensures res == p.IsValidSpec()
+decreases _
+func (p AddrPort) IsValid() (res bool)
+
+decreases _
+func (p AddrPort) Addr() Addr
+
+decreases _
+func (p AddrPort) Port() uint16
+
+decreases _
+func (p AddrPort) String() string

@@ -20,8 +20,9 @@ import (
 	"errors"
 	"hash"
 	"net"
+	"net/netip"
 
-	"github.com/google/gopacket"
+	"github.com/gopacket/gopacket"
 
 	"github.com/scionproto/scion/pkg/addr"
 	"github.com/scionproto/scion/pkg/scrypto"
@@ -38,9 +39,10 @@ ghost const MutexPerm perm = 1/4
 ghost const OutMutexPerm perm = 3/4
 ghost const runningPerm perm = 1/2
 
+// TODO(VerifiedSCION): Not sure yet how to define MutexInvariant. 
+// "d.running" is no longer boolean, so we can not use it here (see previous definition of MutexInvariant).
 pred MutexInvariant(d *DataPlane) {
-	acc(&d.running, runningPerm) &&
-	(!d.running ==> acc(d.Mem(), MutexPerm))
+	false
 }
 
 pred (d *DataPlane) Mem() {
@@ -48,8 +50,6 @@ pred (d *DataPlane) Mem() {
 	acc(&d.external)                                              &&
 	acc(&d.linkTypes)                                             &&
 	acc(&d.neighborIAs)                                           &&
-	acc(&d.internal)                                              &&
-	acc(&d.internalIP)                                            &&
 	acc(&d.internalNextHops)                                      &&
 	acc(&d.svc)                                                   &&
 	acc(&d.macFactory)                                            &&
@@ -62,9 +62,7 @@ pred (d *DataPlane) Mem() {
 	(d.external    != nil       ==> accBatchConn(d.external))     &&
 	(d.linkTypes   != nil       ==> acc(d.linkTypes))             &&
 	(d.neighborIAs != nil       ==> acc(d.neighborIAs))           &&
-	(d.internal != nil          ==> d.internal.Mem())             &&
-	(d.internalIP != nil        ==> d.internalIP.Mem())           &&
-	(d.internalNextHops != nil  ==> accAddr(d.internalNextHops))  &&
+	(d.internalNextHops != nil  ==> acc(d.internalNextHops))  	  &&
 	(d.svc != nil               ==> d.svc.Mem())                  &&
 	(d.macFactory != nil        ==> (
 		acc(d.key)                                      &&
@@ -79,9 +77,8 @@ pred (d *DataPlane) Mem() {
 	(d.forwardingMetrics != nil ==> accForwardingMetrics(d.forwardingMetrics))
 }
 
-pred accAddr(addrs map[uint16]*net.UDPAddr) {
-	acc(addrs) &&
-	forall a *net.UDPAddr :: { a in range(addrs) } a in range(addrs) ==> acc(a.Mem(), _)
+pred accAddr(addrs map[uint16]netip.AddrPort) {	
+	acc(addrs)
 }
 
 pred accBatchConn(batchConns map[uint16]BatchConn) {
@@ -96,41 +93,48 @@ pred accBfdSession(bfdSessions map[uint16]bfdSession) {
 		(bfd != nil && acc(bfd.Mem(), _)))
 }
 
-pred accForwardingMetrics(metrics map[uint16]forwardingMetrics) {
+pred accForwardingMetrics(metrics map[uint16]interfaceMetrics) {
 	acc(metrics) &&
 	forall id uint16 :: { metrics[id] } id in domain(metrics) ==>
 		acc(forwardingMetricsMem(metrics[id], id), _)
 }
 
-pred forwardingMetricsMem(v forwardingMetrics, ignoredForInjectivity uint16) {
-	v.InputBytesTotal.Mem()     &&
-	v.OutputBytesTotal.Mem()    &&
-	v.InputPacketsTotal.Mem()   &&
-	v.OutputPacketsTotal.Mem()  &&
-	v.DroppedPacketsTotal.Mem()
+pred forwardingMetricsMem(v interfaceMetrics, ignoredForInjectivity uint16) {
+	acc(v) &&
+	forall id sizeClass :: { v[id] } id in domain(v) ==> (
+		v[id].InputBytesTotal.Mem()      		&&
+		v[id].InputPacketsTotal.Mem()    		&&
+		v[id].DroppedPacketsInvalid.Mem()		&&
+		v[id].DroppedPacketsBusyProcessor.Mem() &&
+		v[id].DroppedPacketsBusyForwarder.Mem() &&
+		v[id].DroppedPacketsBusySlowPath.Mem() 	&&
+		v[id].ProcessedPackets.Mem())
 }
 
-pred forwardingMetricsNonInjectiveMem(v forwardingMetrics) {
-	v.InputBytesTotal.Mem()     &&
-	v.OutputBytesTotal.Mem()    &&
-	v.InputPacketsTotal.Mem()   &&
-	v.OutputPacketsTotal.Mem()  &&
-	v.DroppedPacketsTotal.Mem()
+pred forwardingMetricsNonInjectiveMem(v interfaceMetrics) {
+	acc(v) &&
+	forall id sizeClass :: { v[id] } id in domain(v) ==> (
+		v[id].InputBytesTotal.Mem()      		&&
+		v[id].InputPacketsTotal.Mem()    		&&
+		v[id].DroppedPacketsInvalid.Mem()		&&
+		v[id].DroppedPacketsBusyProcessor.Mem() &&
+		v[id].DroppedPacketsBusyForwarder.Mem() &&
+		v[id].DroppedPacketsBusySlowPath.Mem() 	&&
+		v[id].ProcessedPackets.Mem())
 }
 
 ghost
 requires  acc(forwardingMetricsNonInjectiveMem(v), _)
 ensures   acc(forwardingMetricsMem(v, id), _)
 decreases
-func liftForwardingMetricsNonInjectiveMem(v forwardingMetrics, id uint16) {
+func liftForwardingMetricsNonInjectiveMem(v interfaceMetrics, id uint16) {
 	unfold acc(forwardingMetricsNonInjectiveMem(v), _)
 	fold acc(forwardingMetricsMem(v, id), _)
 }
 
 pred (p *scionPacketProcessor) initMem() {
 	acc(&p.d)                                    &&
-	acc(&p.ingressID)                            &&
-	acc(&p.buffer)                               &&
+	acc(&p.pkt)									 &&
 	acc(&p.mac)                                  &&
 	acc(p.scionLayer.NonInitMem())               &&
 	p.scionLayer.PathPoolInitializedNonInitMem() &&
@@ -140,9 +144,10 @@ pred (p *scionPacketProcessor) initMem() {
 	acc(&p.path)                                 &&
 	acc(&p.hopField)                             &&
 	acc(&p.infoField)                            &&
-	acc(&p.segmentChange)                        &&
+	acc(&p.effectiveXover)                       &&
+	acc(&p.peering)                        		 &&	
 	acc(&p.cachedMac)                            &&
-	acc(&p.macBuffers)                           &&
+	acc(&p.macInputBuffer)                       &&
 	acc(&p.bfdLayer)
 }
 
@@ -158,12 +163,6 @@ func MacFactorySpec(ghost key *[]byte) (res hash.Hash)
 pred hideLocalIA(p *addr.IA) {
 	acc(p)
 }
-
-pred (err scmpError) ErrorMem() {
-	err.Cause != nil ==> err.Cause.ErrorMem()
-}
-
-scmpError implements error
 
 type offsetPair struct {
 	start int
@@ -183,7 +182,7 @@ func newOffsetPair(n int) (res seq[offsetPair])
 ghost
 requires acc(d.Mem(), _)
 ensures  acc(&d.internalNextHops, _)
-ensures  d.internalNextHops != nil ==> acc(accAddr(d.internalNextHops), _)
+ensures  d.internalNextHops != nil ==> acc(d.internalNextHops, _)
 decreases
 func (d *DataPlane) getInternalNextHops() {
 	unfold acc(d.Mem(), _)
@@ -202,17 +201,9 @@ func (d *DataPlane) getForwardingMetrics() {
 ghost
 requires d.Mem()
 decreases
-pure func (d *DataPlane) getValForwardingMetrics() map[uint16]forwardingMetrics {
+pure func (d *DataPlane) getValForwardingMetrics() map[uint16]interfaceMetrics {
 	return unfolding d.Mem() in
 		d.forwardingMetrics
-}
-
-ghost
-requires p.sInit()
-decreases
-pure func (p *scionPacketProcessor) getIngressID() uint16 {
-	return unfolding p.sInit() in
-		p.ingressID
 }
 
 ghost
@@ -240,9 +231,7 @@ decreases
 pure func (d *DataPlane) GetDomInternalNextHops() set[uint16] {
 	return unfolding d.Mem() in
 		d.internalNextHops == nil ?
-			set[uint16]{} :
-			(unfolding accAddr(d.internalNextHops) in
-				domain(d.internalNextHops))
+			set[uint16]{} :	domain(d.internalNextHops)
 }
 
 ghost
@@ -364,14 +353,6 @@ func (d *DataPlane) getSvcMem() {
 }
 
 ghost
-requires acc(d.Mem(), _) && d.InternalConnIsSet()
-ensures  acc(&d.internal, _) && acc(d.internal.Mem(), _)
-decreases
-func (d *DataPlane) getInternalMem() {
-	unfold acc(d.Mem(), _)
-}
-
-ghost
 requires acc(d.Mem(), _)
 ensures  acc(&d.running, _)
 decreases
@@ -404,15 +385,6 @@ func (d *DataPlane) getBfdSessionsMem() {
 	unfold acc(d.Mem(), _)
 }
 
-ghost
-requires acc(d.Mem(), _)
-ensures  acc(&d.internal, _)
-ensures  d.internal != nil ==> acc(d.internal.Mem(), _)
-decreases
-func (d *DataPlane) getInternal() {
-	unfold acc(d.Mem(), _)
-}
-
 requires acc(d.Mem(), _)
 ensures  acc(&d.macFactory, _)
 decreases
@@ -437,47 +409,9 @@ type Unit struct{}
 ghost
 requires d.Mem()
 decreases
-pure func (d *DataPlane) IsRunning() bool {
-	return unfolding d.Mem() in
-		d.running
-}
-
-ghost
-opaque
-requires d.Mem()
-requires acc(&d.running)
-ensures  d.IsRunning() == d.running
-decreases
-pure func (d *DataPlane) isRunningEq() Unit {
-	return unfolding d.Mem() in
-		Unit{}
-}
-
-ghost
-requires d.Mem()
-decreases
-pure func (d *DataPlane) InternalConnIsSet() bool {
-	return unfolding d.Mem() in
-		d.internal != nil
-}
-
-ghost
-requires d.Mem()
-decreases
 pure func (d *DataPlane) MetricsAreSet() bool {
 	return unfolding d.Mem() in
 		d.Metrics != nil
-}
-
-ghost
-opaque
-requires d.Mem()
-requires acc(&d.internal)
-ensures  d.InternalConnIsSet() == (d.internal != nil)
-decreases
-pure func (d *DataPlane) internalIsSetEq() Unit {
-	return unfolding d.Mem() in
-		Unit{}
 }
 
 ghost
@@ -535,43 +469,12 @@ pred writeMsgInv(writeMsgs underlayconn.Messages) {
 }
 /** end of definitions used internally for the proof of Run **/
 
-/** ErrorCell **/
-pred (s *scmpError) Mem() {
-	acc(s)
-}
-
-preserves s.Mem() && s.CanSet(e)
-ensures   s.Get() === e
-decreases
-func (s *scmpError) Set(e error) {
-	unfold s.Mem()
-	defer fold s.Mem()
-	newErr := e.(scmpError)
-	*s = newErr
-}
-
-ghost
-requires s.Mem()
-decreases
-pure func (s *scmpError) Get() error {
-	return unfolding s.Mem() in
-		*s
-}
-
-ghost
-decreases
-pure func (s *scmpError) CanSet(e error) bool {
-	return typeOf(e) == type[scmpError]
-}
 
 /** spec for newPacketProcessor **/
 
 // initial state, established after allocating with newPacketProcessor.
 pred (s* scionPacketProcessor) sInit() {
 	acc(&s.d)                                    &&
-	acc(&s.ingressID)                            &&
-	acc(&s.buffer) && s.buffer != nil            &&
-	s.buffer.Mem()                               &&
 	acc(&s.mac) && s.mac != nil && s.mac.Mem()   &&
 	s.scionLayer.NonInitMem()                    &&
 	// The following is not necessary
@@ -582,13 +485,11 @@ pred (s* scionPacketProcessor) sInit() {
 	acc(&s.path)                                 &&
 	acc(&s.hopField)                             &&
 	acc(&s.infoField)                            &&
-	acc(&s.segmentChange)                        &&
+	acc(&s.effectiveXover)                       &&
+	acc(&s.peering)                        		 &&
 	acc(&s.cachedMac)                            &&
-	acc(&s.macBuffers)                           &&
-	sl.Bytes(s.macBuffers.scionInput, 0, len(s.macBuffers.scionInput)) &&
-	s.bfdLayer.NonInitMem()                      &&
-	acc(&s.srcAddr)                              &&
-	acc(&s.rawPkt)
+	acc(&s.macInputBuffer)                       &&
+	s.bfdLayer.NonInitMem()
 }
 
 // each ghost method on *scionPacketProcessor has, in the name, the state in which it
@@ -599,14 +500,6 @@ decreases
 pure func (s* scionPacketProcessor) sInitD() (res *DataPlane) {
 	return unfolding s.sInit() in
 		s.d
-}
-
-ghost
-requires s.sInit()
-decreases
-pure func (s* scionPacketProcessor) sInitRawPkt() (res []byte) {
-	return unfolding s.sInit() in
-		s.rawPkt
 }
 
 ghost
@@ -631,22 +524,6 @@ decreases
 pure func (s* scionPacketProcessor) sInitInfoField() (res path.InfoField) {
 	return unfolding s.sInit() in
 		s.infoField
-}
-
-ghost
-requires s.sInit()
-decreases
-pure func (s* scionPacketProcessor) sInitSegmentChange() (res bool) {
-	return unfolding s.sInit() in
-		s.segmentChange
-}
-
-ghost
-requires s.sInit()
-decreases
-pure func (s* scionPacketProcessor) sInitBufferUBuf() (res []byte) {
-	return unfolding s.sInit() in
-		s.buffer.UBuf()
 }
 
 /** end spec for newPacketProcessor **/
@@ -679,18 +556,6 @@ func ResetDecodingLayers(
 	if hasE2eLayer {
 		e2eLayer.DowngradePerm(ubE2eLayer)
 	}
-}
-
-pred (d *DataPlane) validResult(result processResult, addrAliasesPkt bool) {
-	acc(d.Mem(), _)    &&
-	// EgressID
-	(result.EgressID != 0 ==> result.EgressID in d.getDomForwardingMetrics()) &&
-	// OutConn
-	(result.OutConn != nil ==> acc(result.OutConn.Mem(), _)) &&
-	// OutAddr
-	(addrAliasesPkt  && result.OutAddr != nil ==> acc(result.OutAddr.Mem(), R15)) &&
-	(!addrAliasesPkt && result.OutAddr != nil ==> acc(result.OutAddr.Mem(), _))
-	// OutPkt moved out
 }
 
 ghost
